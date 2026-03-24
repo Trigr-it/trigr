@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const vs = require\\(''''node-gyp''''\\); console.log\\(vs\\)\")",
+      "Bash(npx @electron/rebuild --version)",
+      "Bash(cmd.exe /c \"where msbuild 2>&1\")",
+      "Bash(cmd.exe /c \"reg query \"\"HKLM\\\\SOFTWARE\\\\Microsoft\\\\VisualStudio\\\\SxS\\\\VS7\"\" 2>&1\")",
+      "Bash(cmd.exe /c \"reg query \"\"HKLM\\\\SOFTWARE\\\\WOW6432Node\\\\Microsoft\\\\VisualStudio\\\\SxS\\\\VS7\"\" 2>&1\")",
+      "Bash(cmd.exe /c \"dir \"\"C:\\\\Program Files \\(x86\\)\\\\Microsoft Visual Studio\"\" /b 2>&1\")",
+      "Bash(cmd.exe /c \"dir \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\"\" /b 2>&1\")",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio//**)",
+      "Bash(reg query:*)",
+      "Bash(node -e \"const d=require\\(''''fs''''\\).readFileSync\\(0,''''utf8''''\\);const j=JSON.parse\\(d\\);console.log\\(j.version\\)\")",
+      "Bash(xargs grep:*)",
+      "Bash(npm install:*)",
+      "Bash(find node_modules -name package.json -path */node-gyp/package.json)",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(ls:*)",
+      "Bash(cat '/c/Program Files \\(x86\\)/Microsoft Visual Studio/18/BuildTools/MSBuild/Microsoft/VC/v180/Platforms/x64/PlatformToolsets/v145/Toolset.props')",
+      "Bash(cat '/c/Program Files \\(x86\\)/Microsoft Visual Studio/18/BuildTools/MSBuild/Microsoft/VC/v180/Microsoft.CppBuild.targets')",
+      "Bash(find node_modules/uiohook-napi -name *.sln)",
+      "Bash(find node_modules/uiohook-napi -name *.gyp)",
+      "Bash(find \"/c/Program Files \\(x86\\)/Microsoft Visual Studio/18/BuildTools/MSBuild/Microsoft/VC/v180/Platforms\" -name \"v145\" -type d)",
+      "Bash(grep -r \"uiohook\\\\|nutjs\" /c/Users/rory/Downloads/keyforge-prototype/keyforge/src --include=*.js --include=*.jsx)",
+      "Bash(find node_modules/electron -name *.exe)",
+      "Bash(python3:*)",
+      "Bash(find node_modules/uiohook-napi -name *.node)",
+      "Bash(find node_modules/@nut-tree-fork -name *.node)",
+      "Bash(npm_config_arch=x64 node node_modules/electron/install.js)",
+      "Bash(find node_modules/uiohook-napi -name *.d.ts)",
+      "Bash(xargs cat:*)"
+    ]
+  }
+}

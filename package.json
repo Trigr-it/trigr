@@ -1,0 +1,113 @@
+{
+  "name": "keyforge",
+  "version": "1.0.0",
+  "description": "Visual Hotkey & Macro Manager",
+  "author": "Trigr",
+  "main": "electron/main.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
+    "rebuild": "electron-rebuild --arch x64",
+    "gen-icon": "node scripts/gen-tray-icon.js && node scripts/gen-app-icon.js",
+    "package": "node scripts/gen-tray-icon.js && node scripts/gen-app-icon.js && npm run build && electron-builder",
+    "publish": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "electron-updater": "^6.8.3",
+    "koffi": "^2.15.2",
+    "lucide-react": "^0.383.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "uiohook-napi": "^1.5.4"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "concurrently": "^8.2.0",
+    "cross-env": "^7.0.3",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.0.0",
+    "wait-on": "^7.2.0"
+  },
+  "overrides": {
+    "node-gyp": "^12.2.0"
+  },
+  "build": {
+    "extends": null,
+    "appId": "com.keyforge.app",
+    "productName": "Trigr",
+    "copyright": "Copyright © 2024 Trigr",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "public/tray-icon.ico",
+        "to": "tray-icon.ico"
+      },
+      {
+        "from": "public/app-icon.png",
+        "to": "app-icon.png"
+      },
+      {
+        "from": "node_modules/uiohook-napi",
+        "to": "uiohook-napi"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/tray-icon.ico",
+      "publisherName": "Trigr"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Trigr",
+      "runAfterFinish": true
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.icns"
+    },
+    "npmRebuild": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Trigr-it",
+        "repo": "trigr",
+        "private": true,
+        "releaseType": "release"
+      }
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

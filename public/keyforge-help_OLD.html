@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trigr — User Guide</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #e8a020;
+      --bg: #0d0d11;
+      --bg-surface: #141418;
+      --bg-elevated: #1a1a22;
+      --border: #1e1e2a;
+      --border-bright: #252535;
+      --text-primary: #f0f0f8;
+      --text-secondary: #a0a0c0;
+      --text-muted: #505068;
+      --radius: 8px;
+      --font: 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.6;
+      display: flex;
+    }
+
+    /* ── Sidebar ── */
+    nav {
+      width: 200px;
+      min-height: 100vh;
+      flex-shrink: 0;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .nav-logo {
+      padding: 0 16px 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+
+    .nav-logo-name {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+    }
+
+    .nav-logo-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    nav a {
+      display: block;
+      padding: 5px 16px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 12px;
+      border-left: 2px solid transparent;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+
+    nav a:hover {
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.04);
+    }
+
+    nav a.active, nav a:target {
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+
+    nav .nav-section-label {
+      display: block;
+      padding: 12px 16px 4px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ── Content ── */
+    main {
+      flex: 1;
+      max-width: 680px;
+      padding: 40px 48px 80px;
+      overflow-y: auto;
+    }
+
+    h1 { font-size: 26px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; letter-spacing: 0.02em; }
+    h2 { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 40px 0 12px; padding-top: 40px; border-top: 1px solid var(--border); }
+    h2:first-of-type { margin-top: 32px; }
+    h3 { font-size: 13px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin: 24px 0 8px; }
+    p  { color: var(--text-secondary); margin-bottom: 12px; }
+    ul, ol { color: var(--text-secondary); padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 4px; }
+    strong { color: var(--text-primary); font-weight: 600; }
+
+    .lead {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.65;
+    }
+
+    kbd {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-bright);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    code {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #80c0ff;
+    }
+
+    .tip-box {
+      background: rgba(232,160,32,0.08);
+      border: 1px solid rgba(232,160,32,0.25);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin: 16px 0;
+      font-size: 12px;
+      color: #c8941a;
+      line-height: 1.55;
+    }
+
+    .tip-box strong { color: var(--accent); }
+
+    .step-list {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--text-secondary);
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      min-width: 22px;
+      height: 22px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-bright);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }
+    th { text-align: left; padding: 7px 10px; background: var(--bg-elevated); color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--border-bright); }
+    td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--text-secondary); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td:first-child { color: var(--text-primary); font-weight: 500; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-name">Trigr</div>
+    <div class="nav-logo-sub">User Guide</div>
+  </div>
+  <span class="nav-section-label">Getting Started</span>
+  <a href="#overview">Overview</a>
+  <a href="#interface">Interface</a>
+  <span class="nav-section-label">Features</span>
+  <a href="#hotkeys">Hotkey Mapping</a>
+  <a href="#profiles">Profiles</a>
+  <a href="#expansions">Text Expansions</a>
+  <a href="#autocorrect">Autocorrect</a>
+  <a href="#search">Quick Search</a>
+  <span class="nav-section-label">Advanced</span>
+  <a href="#tokens">Tokens & Fill-in</a>
+  <a href="#record">Record Hotkey</a>
+  <a href="#mouse">Mouse Buttons</a>
+  <a href="#backup">Backup & Restore</a>
+  <span class="nav-section-label">Reference</span>
+  <a href="#troubleshooting">Troubleshooting</a>
+</nav>
+
+<main>
+  <h1>Trigr User Guide</h1>
+  <p class="lead">Trigr is a visual hotkey, macro and text expansion manager that runs entirely on your local machine. All your data stays on your device — nothing is ever transmitted to any server.</p>
+
+  <!-- OVERVIEW -->
+  <h2 id="overview">Overview</h2>
+  <p>Trigr has three main capabilities:</p>
+  <ul>
+    <li><strong>Hotkey Mapping</strong> — assign macros to any key combination (Ctrl+Alt+K, Win+F2, etc.) or mouse button</li>
+    <li><strong>Text Expansions</strong> — type a short trigger word and have it automatically replaced with a longer phrase, template or dynamic text</li>
+    <li><strong>Autocorrect</strong> — automatically fix common typos as you type, system-wide</li>
+  </ul>
+  <p>Everything fires globally in the background — macros and expansions work in any application.</p>
+
+  <!-- INTERFACE -->
+  <h2 id="interface">Interface</h2>
+  <h3>Title Bar</h3>
+  <p>The title bar contains the <strong>profile switcher</strong>, a <strong>Macros On/Off toggle</strong>, theme toggle, and the Settings button. You can pause all macros instantly with the toggle without closing the app.</p>
+  <h3>Sidebar</h3>
+  <p>The sidebar switches between <strong>Mapping</strong> (keyboard/mouse assignment view) and <strong>Text Expansions</strong>.</p>
+  <h3>Modifier Bar</h3>
+  <p>The row of buttons above the keyboard — <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>Win</kbd> — lets you select which hotkey layer you're viewing. Click one or more to see what's assigned to that combination. Only keys assigned on that layer are highlighted.</p>
+
+  <!-- HOTKEYS -->
+  <h2 id="hotkeys">Hotkey Mapping</h2>
+  <ol class="step-list">
+    <li>Click one or more modifier buttons in the modifier bar (e.g. <kbd>Ctrl</kbd>)</li>
+    <li>Click any key on the keyboard that you want to assign</li>
+    <li>In the panel on the right, choose what the hotkey should do: launch an app, open a URL, type text, run a macro sequence, etc.</li>
+    <li>Click <strong>Save</strong></li>
+  </ol>
+  <div class="tip-box"><strong>Tip:</strong> Use the <strong>⏺ Record</strong> button to capture a hotkey by simply pressing it on your keyboard, instead of clicking modifier buttons manually.</div>
+  <h3>Double-tap support</h3>
+  <p>Any hotkey can have a second action assigned to it that fires when you press the same combo <em>twice quickly</em>. In the macro panel, switch to the <strong>×2 Double-tap</strong> tab to assign a separate action.</p>
+  <h3>Bare Keys</h3>
+  <p>In app-specific profiles, you can assign macros to bare keys (no modifier required) that only fire when that app is focused. Select <kbd>Bare Keys</kbd> in the modifier bar — this option is only available in profiles with a linked application.</p>
+
+  <!-- PROFILES -->
+  <h2 id="profiles">Profiles</h2>
+  <p>Profiles let you have different hotkey sets for different contexts. The profile switcher is in the title bar.</p>
+  <h3>Global profile</h3>
+  <p>The active global profile fires its macros in all applications, unless an app-specific profile takes precedence.</p>
+  <h3>App-specific profiles</h3>
+  <p>Create a profile and link it to a specific application (e.g. AutoCAD, Photoshop). When that application becomes the foreground window, Trigr automatically switches to that profile. When you switch away, it switches back.</p>
+  <ol class="step-list">
+    <li>Click the profile name in the title bar to open the profile menu</li>
+    <li>Click <strong>+ New Profile</strong></li>
+    <li>In Settings for that profile, click <strong>Link to Application</strong> and browse for the executable</li>
+  </ol>
+
+  <!-- EXPANSIONS -->
+  <h2 id="expansions">Text Expansions</h2>
+  <p>Text expansions let you type a short word (the trigger) and have it automatically replaced with longer text. They work in any application, system-wide.</p>
+  <ol class="step-list">
+    <li>Click <strong>Text Expansions</strong> in the sidebar</li>
+    <li>Click <strong>+ Add</strong></li>
+    <li>Enter a <strong>trigger word</strong> (e.g. <code>signoff</code>) — no spaces allowed</li>
+    <li>Optionally add a <strong>display name</strong> so you can find it easily in search</li>
+    <li>Type your replacement text in the editor</li>
+    <li>Click <strong>Save</strong></li>
+  </ol>
+  <p>Type your trigger word followed by <kbd>Space</kbd> in any app and it will be replaced instantly. For <strong>⚡ Instant</strong> mode, the expansion fires immediately after the last character without needing Space.</p>
+  <div class="tip-box"><strong>Tip:</strong> Use categories to organise expansions — add a category from the bar above the list, then assign expansions to it.</div>
+  <h3>Dynamic tokens</h3>
+  <p>Click <strong>Insert ▾</strong> in the editor toolbar to add dynamic content:</p>
+  <table>
+    <tr><th>Token</th><th>What it inserts</th></tr>
+    <tr><td>{clipboard}</td><td>The current clipboard contents at time of firing</td></tr>
+    <tr><td>{date:DD/MM/YYYY}</td><td>Today's date in the chosen format</td></tr>
+    <tr><td>{time:HH:MM}</td><td>The current time</td></tr>
+    <tr><td>{dayofweek}</td><td>Day name e.g. "Monday"</td></tr>
+    <tr><td>{cursor}</td><td>Moves the cursor to this position after pasting</td></tr>
+    <tr><td>Fill-in Field…</td><td>Prompts you to type a value each time the expansion fires</td></tr>
+  </table>
+
+  <!-- AUTOCORRECT -->
+  <h2 id="autocorrect">Autocorrect</h2>
+  <p>Trigr includes a built-in library of 50+ common typos (teh→the, recieve→receive, etc.) plus a custom corrections list you manage yourself.</p>
+  <p>Open <strong>Text Expansions → Autocorrect tab</strong> to enable the built-in library and add your own custom corrections.</p>
+
+  <!-- QUICK SEARCH -->
+  <h2 id="search">Quick Search</h2>
+  <p>Quick Search is a floating overlay that lets you find and fire any macro or expansion from any application without switching to Trigr.</p>
+  <ul>
+    <li>Default hotkey: <kbd>Ctrl</kbd>+<kbd>Space</kbd></li>
+    <li>Type to search across all your macros and expansions</li>
+    <li>Press <kbd>Enter</kbd> or click to fire the selected result</li>
+    <li>Press <kbd>Escape</kbd> to dismiss</li>
+  </ul>
+  <p>You can change the hotkey in <strong>Settings → Quick Search</strong>.</p>
+  <div class="tip-box"><strong>Note:</strong> Win+Space is reserved by Windows for input language switching and cannot be used as the Quick Search hotkey.</div>
+
+  <!-- TOKENS -->
+  <h2 id="tokens">Tokens &amp; Fill-in Fields</h2>
+  <p>Fill-in fields let you create template expansions where you're prompted to type a value each time the expansion fires. For example, a "thank you email" expansion might have a fill-in for the recipient's name.</p>
+  <ol class="step-list">
+    <li>In the expansion editor, click <strong>Insert ▾ → Fill-in Field…</strong></li>
+    <li>Type a label for the prompt (e.g. "Recipient Name")</li>
+    <li>Click <strong>Insert</strong></li>
+  </ol>
+  <p>When the expansion fires, a small popup will appear asking you to fill in each field. Press <kbd>Tab</kbd> to move between fields and <kbd>Enter</kbd> to submit.</p>
+
+  <!-- RECORD -->
+  <h2 id="record">Recording Hotkeys</h2>
+  <p>Instead of clicking modifier buttons manually, you can press <strong>⏺ Record</strong> in the modifier bar and then press the actual key combination you want to assign. Trigr will capture the modifiers and key and select that layer automatically.</p>
+  <ul>
+    <li>Press <kbd>Escape</kbd> during recording to cancel</li>
+    <li>The keyboard dims while recording is active</li>
+  </ul>
+
+  <!-- MOUSE -->
+  <h2 id="mouse">Mouse Button Macros</h2>
+  <p>Switch to the <strong>Mouse</strong> view in the sidebar to assign macros to mouse buttons (back/forward buttons, middle click, etc.). The same modifier layers apply — hold Ctrl and click a mouse button to assign a Ctrl+MouseButton macro.</p>
+
+  <!-- BACKUP -->
+  <h2 id="backup">Backup &amp; Restore</h2>
+  <p>Trigr automatically backs up your config on every launch and every save. Backups are stored in:</p>
+  <p><code>%APPDATA%\KeyForge\backups\</code></p>
+  <p>The last 10 timestamped backups are kept, plus a <code>keyforge-config-last-known-good.json</code> that is always the most recent valid save.</p>
+  <h3>Restoring from backup</h3>
+  <ol class="step-list">
+    <li>Open <strong>Settings → Backup &amp; Restore</strong></li>
+    <li>Click <strong>Restore from Automatic Backup…</strong></li>
+    <li>Choose a backup from the list — each shows date, profile count and expansion count</li>
+    <li>Click <strong>Restore</strong> and confirm</li>
+  </ol>
+  <p>You can also manually export your config from Settings and import it on another machine.</p>
+
+  <!-- TROUBLESHOOTING -->
+  <h2 id="troubleshooting">Troubleshooting</h2>
+  <table>
+    <tr><th>Problem</th><th>Solution</th></tr>
+    <tr>
+      <td>Hotkeys not firing</td>
+      <td>Check the Macros toggle in the title bar — it may be paused. Also ensure the hotkey combo doesn't conflict with a system shortcut.</td>
+    </tr>
+    <tr>
+      <td>Text expansions not expanding</td>
+      <td>Make sure you typed the trigger word exactly and followed it with Space. Check that Autocorrect or the target app isn't intercepting the trigger first.</td>
+    </tr>
+    <tr>
+      <td>Quick Search hotkey not responding</td>
+      <td>Win+Space is reserved by Windows. Try Ctrl+Space or Ctrl+Shift+Space. Change it in Settings → Quick Search.</td>
+    </tr>
+    <tr>
+      <td>Wrong text pasted in CAD/games</td>
+      <td>Change the input method in Settings → Compatibility → Global input method. Try <em>Direct keystrokes</em> for CAD software.</td>
+    </tr>
+    <tr>
+      <td>Fill-in popup doesn't appear</td>
+      <td>The fill-in window may be behind other windows. Check your taskbar. It appears near the cursor position.</td>
+    </tr>
+    <tr>
+      <td>Config seems empty after update</td>
+      <td>Open Settings → Backup &amp; Restore and restore from a recent automatic backup.</td>
+    </tr>
+  </table>
+</main>
+
+</body>
+</html>

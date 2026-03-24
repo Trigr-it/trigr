@@ -1,0 +1,114 @@
+.numpad-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  user-select: none;
+}
+
+.numpad-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ── Key grid: 4 cols × 5 rows, 42×42 px cells with 4 px gaps ─────────────── */
+
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 42px);
+  grid-template-rows: repeat(5, 42px);
+  gap: 4px;
+}
+
+/* ── Individual key ────────────────────────────────────────────────────────── */
+
+.np-key {
+  position: relative;
+  background: var(--key-bg);
+  border: 1px solid var(--key-border);
+  border-radius: 5px;
+  box-shadow: var(--shadow-key);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+  padding: 0;
+  outline: none;
+}
+
+.np-key:hover:not(.no-layer) {
+  background: var(--key-bg-hover);
+  box-shadow: var(--shadow-key-hover);
+}
+
+.np-key.no-layer {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.np-key.assigned {
+  background: var(--key-bg-assigned);
+  border-color: var(--key-border-assigned);
+}
+
+.np-key.selected {
+  background: var(--key-bg-selected);
+  border-color: var(--key-border-selected);
+  box-shadow: 0 0 0 2px rgba(232, 160, 32, 0.25), var(--shadow-key);
+}
+
+.np-key.firing {
+  background: rgba(80, 200, 120, 0.15) !important;
+  border-color: rgba(80, 200, 120, 0.5) !important;
+  animation: np-fire 0.6s ease;
+}
+
+@keyframes np-fire {
+  0%   { background: rgba(80, 200, 120, 0.35); }
+  100% { background: rgba(80, 200, 120, 0.15); }
+}
+
+/* ── Key label ─────────────────────────────────────────────────────────────── */
+
+.np-key-label {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.2;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.np-key.selected .np-key-label {
+  color: var(--accent);
+}
+
+.np-key.assigned .np-key-label {
+  color: var(--text-primary);
+}
+
+.np-key.no-layer .np-key-label {
+  opacity: 0.5;
+}
+
+/* ── Assigned indicator dot ────────────────────────────────────────────────── */
+
+.np-key-dot {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 4px var(--accent);
+}
