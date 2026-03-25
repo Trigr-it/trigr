@@ -16,7 +16,25 @@
   color: var(--text-muted);
 }
 
-/* ── Key grid: 4 cols × 5 rows, 42×42 px cells with 4 px gaps ─────────────── */
+/* ── Nav key grid: 3 cols × 3 rows, 42×42 px cells with 4 px gaps ────────── */
+
+.nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 42px);
+  grid-template-rows: repeat(3, 42px);
+  gap: 4px;
+}
+
+/* ── Divider between nav and numpad sections ───────────────────────────────── */
+
+.numpad-section-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border-bright);
+  margin: 2px 0;
+}
+
+/* ── Numpad key grid: 4 cols × 5 rows, 42×42 px cells with 4 px gaps ─────── */
 
 .numpad-grid {
   display: grid;

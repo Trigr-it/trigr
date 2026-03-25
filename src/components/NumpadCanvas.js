@@ -2,7 +2,20 @@ import React, { useState, useEffect } from 'react';
 import './NumpadCanvas.css';
 import { comboString } from './KeyboardCanvas';
 
-// ── Numpad key grid (CSS-grid positions, 4 cols × 5 rows) ───────────────────
+// ── Navigation / editing keys (3 cols × 3 rows, mirrors physical keyboard) ──
+const NAV_KEYS = [
+  { id: 'PrintScreen', label: 'PrtSc',  col: 1, row: 1, colSpan: 1, rowSpan: 1 },
+  { id: 'ScrollLock',  label: 'Scr\nLk', col: 2, row: 1, colSpan: 1, rowSpan: 1 },
+  { id: 'Pause',       label: 'Pause',  col: 3, row: 1, colSpan: 1, rowSpan: 1 },
+  { id: 'Insert',      label: 'Ins',    col: 1, row: 2, colSpan: 1, rowSpan: 1 },
+  { id: 'Home',        label: 'Home',   col: 2, row: 2, colSpan: 1, rowSpan: 1 },
+  { id: 'PageUp',      label: 'Pg\nUp', col: 3, row: 2, colSpan: 1, rowSpan: 1 },
+  { id: 'Delete',      label: 'Del',    col: 1, row: 3, colSpan: 1, rowSpan: 1 },
+  { id: 'End',         label: 'End',    col: 2, row: 3, colSpan: 1, rowSpan: 1 },
+  { id: 'PageDown',    label: 'Pg\nDn', col: 3, row: 3, colSpan: 1, rowSpan: 1 },
+];
+
+// ── Numpad key grid (4 cols × 5 rows) ───────────────────────────────────────
 const NUMPAD_KEYS = [
   { id: 'NumLock',        label: 'Num\nLock', col: 1, row: 1, colSpan: 1, rowSpan: 1 },
   { id: 'NumpadDivide',   label: '/',          col: 2, row: 1, colSpan: 1, rowSpan: 1 },
@@ -23,6 +36,8 @@ const NUMPAD_KEYS = [
   { id: 'NumpadDecimal',  label: '.',          col: 3, row: 5, colSpan: 1, rowSpan: 1 },
 ];
 
+const NAV_KEY_IDS = new Set(NAV_KEYS.map(k => k.id));
+
 export default function NumpadCanvas({
   selectedKey,
   onKeySelect,
@@ -33,8 +48,10 @@ export default function NumpadCanvas({
   const [firingKeyId, setFiringKeyId] = useState(null);
 
   useEffect(() => {
-    if (lastFired?.keyId?.startsWith('Numpad') || lastFired?.keyId === 'NumLock') {
-      setFiringKeyId(lastFired.keyId);
+    const id = lastFired?.keyId;
+    if (!id) return;
+    if (id.startsWith('Numpad') || id === 'NumLock' || NAV_KEY_IDS.has(id)) {
+      setFiringKeyId(id);
       const t = setTimeout(() => setFiringKeyId(null), 600);
       return () => clearTimeout(t);
     }
@@ -63,30 +80,37 @@ export default function NumpadCanvas({
     return `Assign macro to: ${combo}+${displayLabel}`;
   }
 
+  function renderKey({ id, label, col, row, colSpan, rowSpan }) {
+    const isAssigned = !!getKeyAssignment(id);
+    const isSelected = selectedKey === id;
+    return (
+      <button
+        key={id}
+        className={keyClass(id)}
+        style={{
+          gridColumn: colSpan > 1 ? `${col} / span ${colSpan}` : col,
+          gridRow:    rowSpan > 1 ? `${row} / span ${rowSpan}` : row,
+        }}
+        onClick={noLayer ? undefined : () => onKeySelect(id)}
+        title={keyTitle(id, label)}
+        type="button"
+      >
+        <span className="np-key-label">{label}</span>
+        {isAssigned && !isSelected && <span className="np-key-dot" />}
+      </button>
+    );
+  }
+
   return (
     <div className="numpad-canvas">
+      <div className="numpad-label">Nav</div>
+      <div className="nav-grid">
+        {NAV_KEYS.map(renderKey)}
+      </div>
+      <div className="numpad-section-divider" />
       <div className="numpad-label">Numpad</div>
       <div className="numpad-grid">
-        {NUMPAD_KEYS.map(({ id, label, col, row, colSpan, rowSpan }) => {
-          const isAssigned = !!getKeyAssignment(id);
-          const isSelected = selectedKey === id;
-          return (
-            <button
-              key={id}
-              className={keyClass(id)}
-              style={{
-                gridColumn: colSpan > 1 ? `${col} / span ${colSpan}` : col,
-                gridRow:    rowSpan > 1 ? `${row} / span ${rowSpan}` : row,
-              }}
-              onClick={noLayer ? undefined : () => onKeySelect(id)}
-              title={keyTitle(id, label)}
-              type="button"
-            >
-              <span className="np-key-label">{label}</span>
-              {isAssigned && !isSelected && <span className="np-key-dot" />}
-            </button>
-          );
-        })}
+        {NUMPAD_KEYS.map(renderKey)}
       </div>
     </div>
   );

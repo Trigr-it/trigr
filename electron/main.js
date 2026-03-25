@@ -2863,37 +2863,58 @@ ipcMain.handle('install-update', async () => {
   const path = require('path');
   const fs   = require('fs');
 
-  // Scan candidate locations in priority order.
-  // electron-updater saves to app.getPath('appData') + '/' + app.getName() + '-updater'
-  // which on Windows is %APPDATA%\..\Local\<name>-updater (i.e. AppData\Local, not Roaming).
-  const candidateDirs = [
-    path.join(app.getPath('appData'), app.getName() + '-updater'),          // primary — confirmed actual location
+  // Base cache dirs to check, in priority order.
+  // electron-updater saves to AppData\Local\<name>-updater on Windows.
+  const baseDirs = [
+    path.join(app.getPath('appData'), app.getName() + '-updater'),               // primary (confirmed)
     path.join(app.getPath('appData'), '..', 'Local', app.getName() + '-updater'), // explicit Local fallback
-    path.join(os.tmpdir(), app.getName() + '-updater'),                     // legacy temp fallback
+    path.join(os.tmpdir(), app.getName() + '-updater'),                           // legacy temp fallback
   ];
 
   let installerPath = null;
 
-  for (const dir of candidateDirs) {
-    console.log('[Updater] Checking dir:', dir);
-    if (fs.existsSync(dir)) {
-      const files = fs.readdirSync(dir);
-      console.log('[Updater]   Contents:', files);
-      const installer = files.find(f => f.endsWith('.exe') || f.endsWith('.msi'));
-      if (installer) {
-        installerPath = path.join(dir, installer);
-        console.log('[Updater]   Found installer:', installerPath);
+  for (const base of baseDirs) {
+    console.log('[Updater] Checking base dir:', base);
+
+    if (!fs.existsSync(base)) {
+      console.log('[Updater]   Does not exist — skipping');
+      continue;
+    }
+
+    const baseFiles = fs.readdirSync(base);
+    console.log('[Updater]   Contents:', baseFiles);
+
+    // 1. Preferred: pending\ subdirectory — contains the verified temp installer
+    //    e.g. pending\temp-Trigr-Setup-0.1.8.exe
+    const pendingDir = path.join(base, 'pending');
+    if (fs.existsSync(pendingDir)) {
+      const pendingFiles = fs.readdirSync(pendingDir);
+      console.log('[Updater]   pending\ contents:', pendingFiles);
+      const pending = pendingFiles.find(
+        f => (f.startsWith('temp-') || f.endsWith('.exe') || f.endsWith('.msi'))
+      );
+      if (pending) {
+        installerPath = path.join(pendingDir, pending);
+        console.log('[Updater]   Found pending installer:', installerPath);
         break;
-      } else {
-        console.log('[Updater]   No installer found in this dir');
       }
     } else {
-      console.log('[Updater]   Directory does not exist');
+      console.log('[Updater]   No pending\ subdirectory');
     }
+
+    // 2. Fallback: installer.exe (or any .exe/.msi) directly in the base dir
+    const stub = baseFiles.find(f => f === 'installer.exe' || f.endsWith('.exe') || f.endsWith('.msi'));
+    if (stub) {
+      installerPath = path.join(base, stub);
+      console.log('[Updater]   Found base-dir installer (fallback):', installerPath);
+      break;
+    }
+
+    console.log('[Updater]   No installer found in this base dir');
   }
 
   if (!installerPath) {
-    console.error('[Updater] No installer found in any candidate directory');
+    console.error('[Updater] No installer found in any candidate location');
     return { success: false, error: 'No installer found' };
   }
 
