@@ -2764,37 +2764,94 @@ function createWindow() {
 // AUTO-UPDATER
 // ─────────────────────────────────────────────
 function initAutoUpdater() {
+  console.log('[Updater] initAutoUpdater() called — registering event handlers');
+  console.log('[Updater] Current app version:', app.getVersion());
+  console.log('[Updater] Feed config:', JSON.stringify(autoUpdater.getFeedURL?.() ?? '(using package.json publish config)'));
+
+  autoUpdater.logger = console;
+  autoUpdater.autoDownload = false; // never download without explicit user action
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[Updater] Checking for update...');
+  });
+
   autoUpdater.on('update-available', (info) => {
+    console.log('[Updater] Update available:', JSON.stringify(info));
+    // Sum all release file sizes to give the renderer an upfront download size estimate.
+    // With differentialPackage:true the actual download will be smaller (only changed blocks),
+    // but this gives a worst-case ceiling until the real transfer size is known.
+    const downloadSize = Array.isArray(info.files)
+      ? info.files.reduce((sum, f) => sum + (f.size || 0), 0)
+      : null;
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-available', { version: info.version });
+      mainWindow.webContents.send('update-available', { version: info.version, downloadSize });
     }
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('[Updater] No update available. Current version is latest:', JSON.stringify(info));
   });
 
   autoUpdater.on('download-progress', (progress) => {
+    console.log(`[Updater] Download progress: ${progress.percent?.toFixed(1)}% (${progress.transferred}/${progress.total} bytes) @ ${Math.round((progress.bytesPerSecond || 0) / 1024)} KB/s`);
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('download-progress', { percent: progress.percent });
+      mainWindow.webContents.send('download-progress', {
+        percent:        progress.percent,
+        transferred:    progress.transferred,
+        total:          progress.total,
+        bytesPerSecond: progress.bytesPerSecond,
+      });
     }
   });
 
-  autoUpdater.on('update-downloaded', () => {
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[Updater] Update downloaded:', JSON.stringify(info));
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-downloaded');
     }
   });
 
   autoUpdater.on('error', (err) => {
-    console.error('[AutoUpdater] Error:', err?.message ?? err);
+    console.error('[Updater] Error:', err?.message ?? err);
+    console.error('[Updater] Full error:', err);
   });
 
+  console.log('[Updater] Scheduling checkForUpdatesAndNotify in 3 s...');
   setTimeout(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      console.error('[AutoUpdater] checkForUpdatesAndNotify failed:', err?.message ?? err);
+    console.log('[Updater] Calling checkForUpdatesAndNotify()...');
+    autoUpdater.checkForUpdatesAndNotify().then((result) => {
+      console.log('[Updater] checkForUpdatesAndNotify result:', JSON.stringify(result));
+    }).catch((err) => {
+      console.error('[Updater] checkForUpdatesAndNotify failed:', err?.message ?? err);
+      console.error('[Updater] NOTE: If this is a private GitHub repo, a GH_TOKEN env var is required for update checks.');
     });
   }, 3000);
 }
 
+ipcMain.handle('check-for-updates', async () => {
+  console.log('[Updater] Manual check-for-updates triggered via IPC');
+  console.log('[Updater] isDev:', isDev);
+  console.log('[Updater] app.isPackaged:', app.isPackaged);
+  console.log('[Updater] Current version:', app.getVersion());
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    console.log('[Updater] Manual check result:', JSON.stringify(result));
+    return { success: true, result: result ? { version: result.updateInfo?.version } : null };
+  } catch (err) {
+    console.error('[Updater] Manual check error:', err?.message ?? err);
+    return { success: false, error: err?.message ?? String(err) };
+  }
+});
+
 ipcMain.on('install-update', () => {
   autoUpdater.quitAndInstall();
+});
+
+ipcMain.on('start-download', () => {
+  console.log('[Updater] User initiated download');
+  autoUpdater.downloadUpdate().catch((err) => {
+    console.error('[Updater] downloadUpdate failed:', err?.message ?? err);
+  });
 });
 
 app.whenReady().then(() => {
@@ -2804,8 +2861,11 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   startFgWatcher();
+  console.log('[Updater] isDev:', isDev, '| app.isPackaged:', app.isPackaged);
   if (!isDev) {
     initAutoUpdater();
+  } else {
+    console.log('[Updater] Skipping auto-updater — running in dev mode');
   }
 
   // Window audit — logs open BrowserWindows 5 s after startup.

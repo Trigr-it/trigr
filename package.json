@@ -81,7 +81,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Trigr",
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "differentialPackage": true
     },
     "mac": {
       "target": "dmg",

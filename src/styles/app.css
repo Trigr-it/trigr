@@ -217,7 +217,7 @@
 /* ── Update banner ──────────────────────────────────────────── */
 .update-banner {
   position: fixed;
-  top: 0;
+  bottom: 28px; /* sit above the 28px status bar */
   left: 0;
   right: 0;
   z-index: 9999;
@@ -226,7 +226,7 @@
   gap: 10px;
   padding: 7px 14px;
   background: #92400e;
-  border-bottom: 1px solid #b45309;
+  border-top: 1px solid #b45309;
   color: #fef3c7;
   font-size: 12px;
   font-weight: 500;

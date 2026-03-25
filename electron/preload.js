@@ -105,4 +105,6 @@ window.electronAPI = {
   onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (event, data) => callback(data)),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', ()             => callback()),
   installUpdate:      ()         => ipcRenderer.send('install-update'),
+  startDownload:      ()         => ipcRenderer.send('start-download'),
+  checkForUpdates:    ()         => ipcRenderer.invoke('check-for-updates'),
 };

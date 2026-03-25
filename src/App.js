@@ -809,18 +809,42 @@ function App() {
   })();
 
   // Auto-updater listeners
+  // phase: 'available' | 'downloading' | 'ready'
   useEffect(() => {
     if (!window.electronAPI) return;
-    window.electronAPI.onUpdateAvailable(({ version }) => {
-      setUpdateInfo({ version, percent: 0, ready: false, dismissed: false });
+
+    let fallbackTimer = null;
+
+    const clearFallback = () => {
+      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+    };
+
+    window.electronAPI.onUpdateAvailable(({ version, downloadSize }) => {
+      setUpdateInfo({ version, downloadSize: downloadSize || null, percent: 0, bytesPerSecond: 0, total: 0, phase: 'available' });
     });
-    window.electronAPI.onDownloadProgress(({ percent }) => {
-      setUpdateInfo(prev => prev ? { ...prev, percent } : prev);
+
+    window.electronAPI.onDownloadProgress(({ percent, transferred, total, bytesPerSecond }) => {
+      setUpdateInfo(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev, percent, transferred, total, bytesPerSecond };
+        // At 100%, arm a 5-second fallback in case update-downloaded never fires
+        if (percent >= 100 && prev.phase === 'downloading') {
+          clearFallback();
+          fallbackTimer = setTimeout(() => {
+            setUpdateInfo(cur => cur && cur.phase !== 'ready' ? { ...cur, phase: 'ready' } : cur);
+          }, 5000);
+        }
+        return updated;
+      });
     });
+
     window.electronAPI.onUpdateDownloaded(() => {
-      setUpdateInfo(prev => prev ? { ...prev, ready: true } : prev);
+      clearFallback();
+      setUpdateInfo(prev => prev ? { ...prev, phase: 'ready' } : prev);
     });
+
     return () => {
+      clearFallback();
       window.electronAPI.removeAllListeners('update-available');
       window.electronAPI.removeAllListeners('download-progress');
       window.electronAPI.removeAllListeners('update-downloaded');
@@ -830,6 +854,23 @@ function App() {
   // Count assignments for current profile (all combos, excluding expansions)
   const profileAssignmentCount = Object.keys(assignments)
     .filter(k => k.startsWith(activeProfile + '::') && !k.includes('::EXPANSION::')).length;
+
+  // ── Update banner helpers ─────────────────────────────────
+  function fmtBytes(bytes) {
+    if (!bytes || bytes <= 0) return null;
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    if (bytes >= 1024 * 1024)        return `${Math.round(bytes / (1024 * 1024))} MB`;
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+
+  function fmtEta(bytesRemaining, bytesPerSecond) {
+    if (!bytesPerSecond || bytesPerSecond <= 0 || !bytesRemaining) return null;
+    const secs = Math.round(bytesRemaining / bytesPerSecond);
+    if (secs < 5)   return 'almost done';
+    if (secs < 60)  return `${secs}s remaining`;
+    const mins = Math.ceil(secs / 60);
+    return `${mins} min remaining`;
+  }
 
   return (
     <div className="app">
@@ -854,38 +895,69 @@ function App() {
           >Dismiss</button>
         </div>
       )}
-      {updateInfo && !updateInfo.dismissed && (
-        <div className="update-banner">
-          {updateInfo.ready ? (
-            <>
-              <span className="update-banner__text">Update ready — restart to install</span>
-              <button
-                className="update-banner__btn update-banner__btn--restart"
-                onClick={() => window.electronAPI?.installUpdate()}
-                type="button"
-              >Restart Now</button>
-              <button
-                className="update-banner__btn update-banner__btn--later"
-                onClick={() => setUpdateInfo(prev => ({ ...prev, dismissed: true }))}
-                type="button"
-              >Later</button>
-            </>
-          ) : (
-            <>
-              <span className="update-banner__text">
-                Trigr {updateInfo.version} is available — downloading...
-              </span>
-              <span className="update-banner__progress">
-                <span
-                  className="update-banner__progress-bar"
-                  style={{ width: `${Math.round(updateInfo.percent)}%` }}
-                />
-              </span>
-              <span className="update-banner__pct">{Math.round(updateInfo.percent)}%</span>
-            </>
-          )}
-        </div>
-      )}
+      {updateInfo && updateInfo.phase !== 'dismissed' && (() => {
+        const sizeLabel    = fmtBytes(updateInfo.downloadSize);
+        const actualLabel  = fmtBytes(updateInfo.total);          // real differential size once known
+        const displaySize  = actualLabel || sizeLabel;
+        const eta          = fmtEta(
+          (updateInfo.total || 0) - (updateInfo.transferred || 0),
+          updateInfo.bytesPerSecond
+        );
+        return (
+          <div className="update-banner">
+            {updateInfo.phase === 'ready' ? (
+              <>
+                <span className="update-banner__text">Trigr {updateInfo.version} is ready to install</span>
+                <button
+                  className="update-banner__btn update-banner__btn--restart"
+                  onClick={() => window.electronAPI?.installUpdate()}
+                  type="button"
+                >Restart Now</button>
+                <button
+                  className="update-banner__btn update-banner__btn--later"
+                  onClick={() => setUpdateInfo(prev => ({ ...prev, phase: 'dismissed' }))}
+                  type="button"
+                >Later</button>
+              </>
+            ) : updateInfo.phase === 'downloading' ? (
+              <>
+                <span className="update-banner__text">
+                  Downloading Trigr {updateInfo.version}
+                  {displaySize ? ` — ${displaySize}` : ''}
+                  {eta ? ` · ${eta}` : ''}
+                </span>
+                <span className="update-banner__progress">
+                  <span
+                    className="update-banner__progress-bar"
+                    style={{ width: `${Math.round(updateInfo.percent)}%` }}
+                  />
+                </span>
+                <span className="update-banner__pct">{Math.round(updateInfo.percent)}%</span>
+              </>
+            ) : (
+              <>
+                <span className="update-banner__text">
+                  Trigr {updateInfo.version} available
+                  {displaySize ? ` — ${displaySize}` : ''}
+                </span>
+                <button
+                  className="update-banner__btn update-banner__btn--restart"
+                  onClick={() => {
+                    setUpdateInfo(prev => ({ ...prev, phase: 'downloading' }));
+                    window.electronAPI?.startDownload();
+                  }}
+                  type="button"
+                >Download &amp; Install</button>
+                <button
+                  className="update-banner__btn update-banner__btn--later"
+                  onClick={() => setUpdateInfo(prev => ({ ...prev, phase: 'dismissed' }))}
+                  type="button"
+                >Later</button>
+              </>
+            )}
+          </div>
+        );
+      })()}
       <TitleBar
         activeProfile={activeProfile}
         profiles={profiles}
