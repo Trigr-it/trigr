@@ -2769,7 +2769,9 @@ function initAutoUpdater() {
   console.log('[Updater] Feed config:', JSON.stringify(autoUpdater.getFeedURL?.() ?? '(using package.json publish config)'));
 
   autoUpdater.logger = console;
-  autoUpdater.autoDownload = false; // never download without explicit user action
+  autoUpdater.autoDownload = false;        // never download without explicit user action
+  autoUpdater.autoInstallOnAppQuit = true; // apply cached update when app quits normally
+  autoUpdater.allowDowngrade = false;      // never roll back to an older version
 
   autoUpdater.on('checking-for-update', () => {
     console.log('[Updater] Checking for update...');
@@ -2806,6 +2808,14 @@ function initAutoUpdater() {
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log('[Updater] Update downloaded:', JSON.stringify(info));
+    // Log the cache path so we can verify the file is on disk
+    try {
+      const os = require('os');
+      const path = require('path');
+      const cachePath = path.join(os.tmpdir(), `${app.getName()}-updater`);
+      console.log('[Updater] Expected cache directory:', cachePath);
+      console.log('[Updater] autoInstallOnAppQuit:', autoUpdater.autoInstallOnAppQuit);
+    } catch (e) { /* non-fatal */ }
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-downloaded');
     }
@@ -2844,7 +2854,7 @@ ipcMain.handle('check-for-updates', async () => {
 });
 
 ipcMain.on('install-update', () => {
-  autoUpdater.quitAndInstall();
+  autoUpdater.quitAndInstall(false, true);
 });
 
 ipcMain.on('start-download', () => {
