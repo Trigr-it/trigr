@@ -2775,27 +2775,6 @@ function initAutoUpdater() {
   autoUpdater.disableDifferentialDownload = true; // skip blockmap diff — avoids stall when old blockmap is unavailable locally
   autoUpdater.disableWebInstaller = true;        // use the full NSIS installer, not the web stub
 
-  // Force the download cache to use "trigr-updater" regardless of the package.json "name" field.
-  // electron-updater derives the cache dir from app.getName() which returns the "name" field
-  // ("keyforge"), not "productName" ("Trigr"). Setting it explicitly here ensures the cached
-  // installer and the nuclear fallback path in install-update both agree on the directory name.
-  try {
-    const os   = require('os');
-    const path = require('path');
-    autoUpdater.app = autoUpdater.app ?? {};
-    const cacheDir = path.join(os.tmpdir(), 'trigr-updater');
-    // electron-updater exposes downloadedUpdateHelper once a download has run;
-    // the cache root is set via the internal _downloadedUpdateHelper or by
-    // overriding the cachePath getter on the updater instance.
-    Object.defineProperty(autoUpdater, 'cachePath', {
-      get: () => cacheDir,
-      configurable: true,
-    });
-    console.log('[Updater] Cache directory forced to:', cacheDir);
-  } catch (e) {
-    console.warn('[Updater] Could not override cachePath — cache dir may still be keyforge-updater:', e?.message ?? e);
-  }
-
   autoUpdater.on('checking-for-update', () => {
     console.log('[Updater] Checking for update...');
   });
@@ -2831,12 +2810,14 @@ function initAutoUpdater() {
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log('[Updater] Update downloaded:', JSON.stringify(info));
-    // Log the cache path so we can verify the file is on disk
+    // Log the actual cache path so we can verify the file is on disk
     try {
-      const os = require('os');
       const path = require('path');
-      const cachePath = path.join(os.tmpdir(), 'trigr-updater');
+      const fs = require('fs');
+      const cachePath = path.join(app.getPath('appData'), app.getName() + '-updater');
       console.log('[Updater] Expected cache directory:', cachePath);
+      console.log('[Updater] Cache exists:', fs.existsSync(cachePath));
+      if (fs.existsSync(cachePath)) console.log('[Updater] Cache contents:', fs.readdirSync(cachePath));
       console.log('[Updater] autoInstallOnAppQuit:', autoUpdater.autoInstallOnAppQuit);
     } catch (e) { /* non-fatal */ }
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -2878,68 +2859,53 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('install-update', async () => {
   console.log('[Updater] install-update IPC handler called');
-  console.log('[Updater] currentVersion:', autoUpdater.currentVersion);
-  console.log('[Updater] autoInstallOnAppQuit:', autoUpdater.autoInstallOnAppQuit);
+  const os   = require('os');
+  const path = require('path');
+  const fs   = require('fs');
 
-  // Check if there is a cached update on disk
-  try {
-    const os = require('os');
-    const path = require('path');
-    const fs = require('fs');
-    const cachePath = path.join(os.tmpdir(), 'trigr-updater');
-    console.log('[Updater] Cache directory:', cachePath);
-    if (fs.existsSync(cachePath)) {
-      const files = fs.readdirSync(cachePath);
-      console.log('[Updater] Cache contents:', files);
+  // Scan candidate locations in priority order.
+  // electron-updater saves to app.getPath('appData') + '/' + app.getName() + '-updater'
+  // which on Windows is %APPDATA%\..\Local\<name>-updater (i.e. AppData\Local, not Roaming).
+  const candidateDirs = [
+    path.join(app.getPath('appData'), app.getName() + '-updater'),          // primary — confirmed actual location
+    path.join(app.getPath('appData'), '..', 'Local', app.getName() + '-updater'), // explicit Local fallback
+    path.join(os.tmpdir(), app.getName() + '-updater'),                     // legacy temp fallback
+  ];
+
+  let installerPath = null;
+
+  for (const dir of candidateDirs) {
+    console.log('[Updater] Checking dir:', dir);
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir);
+      console.log('[Updater]   Contents:', files);
+      const installer = files.find(f => f.endsWith('.exe') || f.endsWith('.msi'));
+      if (installer) {
+        installerPath = path.join(dir, installer);
+        console.log('[Updater]   Found installer:', installerPath);
+        break;
+      } else {
+        console.log('[Updater]   No installer found in this dir');
+      }
     } else {
-      console.warn('[Updater] Cache directory does not exist — update may not have been downloaded');
+      console.log('[Updater]   Directory does not exist');
     }
-  } catch (e) {
-    console.error('[Updater] Error checking cache dir:', e?.message ?? e);
+  }
+
+  if (!installerPath) {
+    console.error('[Updater] No installer found in any candidate directory');
+    return { success: false, error: 'No installer found' };
   }
 
   try {
-    console.log('[Updater] Calling autoUpdater.quitAndInstall(false, true)...');
-    autoUpdater.quitAndInstall(false, true);
-    console.log('[Updater] quitAndInstall() returned (app should be quitting)');
+    console.log('[Updater] Launching installer via shell.openPath:', installerPath);
+    await shell.openPath(installerPath);
+    console.log('[Updater] Installer launched — quitting app');
+    app.quit();
     return { success: true };
   } catch (err) {
-    console.error('[Updater] quitAndInstall() threw:', err?.message ?? err);
-    console.error('[Updater] Full error:', err);
-
-    // Nuclear fallback: find the installer in the cache and run it directly
-    try {
-      console.log('[Updater] Attempting nuclear fallback: launching installer directly...');
-      const os = require('os');
-      const path = require('path');
-      const fs = require('fs');
-      const cachePath = path.join(os.tmpdir(), 'trigr-updater');
-      console.log('[Updater] Looking for installer in:', cachePath);
-
-      let installerPath = null;
-      if (fs.existsSync(cachePath)) {
-        const files = fs.readdirSync(cachePath);
-        console.log('[Updater] Cache files:', files);
-        const installer = files.find(f => f.endsWith('.exe') || f.endsWith('.msi'));
-        if (installer) {
-          installerPath = path.join(cachePath, installer);
-        }
-      }
-
-      if (installerPath && fs.existsSync(installerPath)) {
-        console.log('[Updater] Launching installer:', installerPath);
-        await shell.openPath(installerPath);
-        console.log('[Updater] Installer launched — quitting app');
-        app.quit();
-        return { success: true, fallback: true };
-      } else {
-        console.error('[Updater] No installer found in cache for nuclear fallback');
-        return { success: false, error: err?.message ?? String(err), fallback: false };
-      }
-    } catch (fallbackErr) {
-      console.error('[Updater] Nuclear fallback also failed:', fallbackErr?.message ?? fallbackErr);
-      return { success: false, error: err?.message ?? String(err), fallbackError: fallbackErr?.message ?? String(fallbackErr) };
-    }
+    console.error('[Updater] Failed to launch installer:', err?.message ?? err);
+    return { success: false, error: err?.message ?? String(err) };
   }
 });
 
