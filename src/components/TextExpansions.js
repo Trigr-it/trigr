@@ -508,7 +508,7 @@ export default function TextExpansions({
   // If the active category is deleted, fall back to All
   useEffect(() => {
     if (activeCategory !== 'All' && activeCategory !== '__uncategorised__' &&
-        !categories.some(c => c.name === activeCategory)) {
+        !categories.some(c => (typeof c === 'string' ? c : c?.name) === activeCategory)) {
       setActiveCategory('All');
     }
   }, [categories, activeCategory]);
@@ -612,14 +612,14 @@ export default function TextExpansions({
       setDragCat(null); setDragOverCat(null); setDragOverSide(null);
       return;
     }
-    const newCats = [...categories];
+    const newCats = [...normCategories];
     const fromIdx = newCats.findIndex(c => c.name === dragCat);
     let toIdx = newCats.findIndex(c => c.name === cat);
     if (dragOverSide === 'after') toIdx += 1;
     // Account for the gap left when the dragged item is removed
     const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx;
-    newCats.splice(fromIdx, 1);
-    newCats.splice(Math.max(0, insertAt), 0, dragCat);
+    const [movedCat] = newCats.splice(fromIdx, 1);  // capture the object, not the name string
+    newCats.splice(Math.max(0, insertAt), 0, movedCat);
     onReorderCategories?.(newCats);
     setDragCat(null); setDragOverCat(null); setDragOverSide(null);
   }
@@ -657,6 +657,12 @@ export default function TextExpansions({
   const canSave   = trigger.trim() && editorValue.text.trim() && !triggerError;
   const canAcSave = acTypo.trim() && acCorrection.trim();
 
+  // Normalise categories — guard against old string-array format surviving in
+  // config or being introduced by a stale drag-and-drop state.
+  const normCategories = categories
+    .map(c => typeof c === 'string' ? { name: c, colour: null } : c)
+    .filter(c => c && c.name);
+
   const uncategorisedCount = expansions.filter(e => !e.category).length;
 
   // Build flat list for the current expansion tab
@@ -685,7 +691,7 @@ export default function TextExpansions({
       result.push({ type: 'header', label: 'Uncategorised', color: null, count: uncat.length });
       uncat.forEach(exp => result.push({ type: 'item', exp }));
     }
-    for (const cat of categories) {
+    for (const cat of normCategories) {
       const items = sortItems(expansions.filter(e => e.category === cat.name));
       if (items.length === 0) continue;
       result.push({ type: 'header', label: cat.name, color: cat.colour || null, count: items.length });
@@ -823,7 +829,7 @@ export default function TextExpansions({
               <span className="te-cat-count">{expansions.length}</span>
             </button>
 
-            {categories.map(cat => {
+            {normCategories.map(cat => {
               const catColour   = cat.colour || null;
               const isPending   = pendingDeleteCat === cat.name;
               const count       = expansions.filter(e => e.category === cat.name).length;
@@ -949,7 +955,7 @@ export default function TextExpansions({
                     );
                   }
                   const { exp } = item;
-                  const catObj = exp.category ? categories.find(c => c.name === exp.category) : null;
+                  const catObj = exp.category ? normCategories.find(c => c.name === exp.category) : null;
                   const color  = catObj?.colour || null;
                   const isEditingThis = editing && !editing.isNew && editing.originalTrigger === exp.trigger;
                   return (
@@ -976,7 +982,7 @@ export default function TextExpansions({
                         {exp.category && (
                           <span
                             className="te-cat-badge"
-                            style={{ '--cat-color': color }}
+                            style={color ? { '--cat-color': color } : {}}
                             title={exp.category}
                           >
                             {exp.category}
@@ -1074,7 +1080,7 @@ export default function TextExpansions({
                         onChange={e => setCategory(e.target.value || null)}
                       >
                         <option value="">Uncategorised</option>
-                        {categories.map(cat => (
+                        {normCategories.map(cat => (
                           <option key={cat.name} value={cat.name}>{cat.name}</option>
                         ))}
                       </select>
@@ -1305,7 +1311,7 @@ export default function TextExpansions({
             value={
               catColourPopover.forCat === '__new__'
                 ? newCategoryColour
-                : categories.find(c => c.name === catColourPopover.forCat)?.colour || null
+                : normCategories.find(c => c.name === catColourPopover.forCat)?.colour || null
             }
             onChange={handleCatColourSelect}
           />
