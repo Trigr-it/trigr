@@ -617,6 +617,12 @@
 
 .macro-step {
   display: flex;
+  flex-direction: column;
+}
+
+/* Inner flex row used by every step type */
+.macro-step-row {
+  display: flex;
   align-items: center;
   gap: 6px;
 }
@@ -647,21 +653,35 @@
   font-size: 11px;
 }
 
-/* Wait for Input step — two selects (and optional key capture) in a row */
-.wfi-controls {
+/* Wait for Input — second row with labelled dropdowns */
+.wfi-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 8px 30px; /* left-indent aligns under step content */
+  border-top: 1px solid var(--border);
+}
+
+.wfi-field {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
 }
 
-.wfi-controls .form-select {
-  flex: 1;
-  min-width: 0;
+.wfi-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.wfi-controls .key-capture {
+.wfi-select {
   flex: 1;
-  min-width: 0;
+  min-width: 160px;
+  font-size: 11px;
 }
 
 .step-remove {

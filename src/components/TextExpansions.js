@@ -36,6 +36,27 @@ const INSERT_MENU = [
   { type: 'item', token: '__fillin__',          label: 'Fill-in Field…',      display: null         },
 ];
 
+// ── Global variable key helpers ─────────────────────────────────────────────
+
+function titleToKey(title) {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, '.')
+    .replace(/\.+/g, '.')
+    .replace(/^\.+|\.+$/g, '');
+}
+
+function keyToTitle(key) {
+  return key.split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+const GD_SUGGESTIONS = [
+  'My Full Name', 'My First Name', 'My Email Address',
+  'My Phone Number', 'My Company', 'My Job Title', 'My Website',
+];
+
 // Generate a consistent colour from a category name
 function categoryColor(name) {
   let hash = 0;
@@ -48,7 +69,7 @@ function categoryColor(name) {
 
 // ── Rich text editor ───────────────────────────────────────────────────────
 
-function RichTextEditor({ initialHtml, onChange }) {
+function RichTextEditor({ initialHtml, onChange, globalVariables = {} }) {
   const editorRef      = useRef(null);
   const btnRef         = useRef(null);
   const menuRef        = useRef(null);
@@ -324,6 +345,7 @@ function RichTextEditor({ initialHtml, onChange }) {
 
           {/* Menu items — hidden while fill-in label input is active */}
           <div style={{ display: fillInEntry ? 'none' : 'contents' }}>
+            <div className="rte-menu-section-label">Dynamic Fields</div>
             {INSERT_MENU.map((item, i) =>
               item.type === 'sep' ? (
                 <div key={`sep-${i}`} className="rte-menu-sep" />
@@ -351,6 +373,30 @@ function RichTextEditor({ initialHtml, onChange }) {
                 </button>
               )
             )}
+            {Object.keys(globalVariables).length > 0 && (
+              <>
+                <div className="rte-menu-sep" />
+                <div className="rte-menu-section-label">Global Variables</div>
+                {Object.entries(globalVariables)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([key]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className="rte-menu-item"
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        insertTokenHtml(`{{${key}}}`, keyToTitle(key));
+                        setShowInsert(false);
+                      }}
+                    >
+                      <span className="rte-menu-chip rte-chip-globalvar">{keyToTitle(key)}</span>
+                      {keyToTitle(key)}
+                    </button>
+                  ))
+                }
+              </>
+            )}
           </div>
         </div>,
         document.body
@@ -374,8 +420,11 @@ export default function TextExpansions({
   autocorrections = [],
   onAddAutocorrect,
   onDeleteAutocorrect,
+  // ── Global Variables
+  globalVariables = {},
+  onSaveGlobalVariables,
 }) {
-  // ── Panel mode (expansions | autocorrect) ──
+  // ── Panel mode (expansions | autocorrect | globalvars) ──
   const [panelMode, setPanelMode] = useState('expansions');
 
   // ── Expansion form state ──
@@ -400,6 +449,12 @@ export default function TextExpansions({
   const [acEditing, setAcEditing]       = useState(null); // null | { isNew, originalTypo? }
   const [acTypo, setAcTypo]             = useState('');
   const [acCorrection, setAcCorrection] = useState('');
+
+  // ── Global Variables form state ──
+  const [gdEditing, setGdEditing]   = useState(null); // null | { isNew, originalKey? }
+  const [gdTitle,   setGdTitle]     = useState('');
+  const [gdValue,   setGdValue]     = useState('');
+  const [gdNameErr, setGdNameErr]   = useState('');
 
   // Reset pending-delete when clicking elsewhere
   useEffect(() => {
@@ -530,6 +585,60 @@ export default function TextExpansions({
   // Sorted custom autocorrections
   const sortedAc = [...autocorrections].sort((a, b) => a.typo.localeCompare(b.typo));
 
+  // ── Global Variables handlers ────────────────────────────────────────────
+
+  function openGdAdd(preTitle = '') {
+    setGdEditing({ isNew: true });
+    setGdTitle(preTitle);
+    setGdValue('');
+    setGdNameErr('');
+  }
+
+  function openGdEdit(key) {
+    setGdEditing({ isNew: false, originalKey: key });
+    setGdTitle(keyToTitle(key));
+    setGdValue(globalVariables[key] ?? '');
+    setGdNameErr('');
+  }
+
+  function handleGdCancel() {
+    setGdEditing(null);
+    setGdNameErr('');
+  }
+
+  function validateGdTitle(title) {
+    const key = titleToKey(title.trim());
+    if (!title.trim()) return 'Display title is required';
+    if (!key) return 'Title must contain at least one letter or digit';
+    if (gdEditing?.isNew && key in globalVariables) return `Key "${key}" already exists — choose a different title`;
+    if (!gdEditing?.isNew && key !== gdEditing?.originalKey && key in globalVariables) return `Key "${key}" already exists — choose a different title`;
+    return '';
+  }
+
+  function handleGdSave() {
+    const err = validateGdTitle(gdTitle);
+    if (err) { setGdNameErr(err); return; }
+    const key = titleToKey(gdTitle.trim());
+    const next = { ...globalVariables };
+    if (!gdEditing.isNew && gdEditing.originalKey && gdEditing.originalKey !== key) {
+      delete next[gdEditing.originalKey];
+    }
+    next[key] = gdValue;
+    onSaveGlobalVariables?.(next);
+    setGdEditing(null);
+    setGdNameErr('');
+  }
+
+  function handleGdDelete(key) {
+    const next = { ...globalVariables };
+    delete next[key];
+    onSaveGlobalVariables?.(next);
+  }
+
+  const sortedGd = Object.entries(globalVariables).sort(([a], [b]) => a.localeCompare(b));
+  const canGdSave = gdTitle.trim() !== '' && gdValue.trim() !== '' && !validateGdTitle(gdTitle);
+  const gdSuggestionsToShow = GD_SUGGESTIONS.filter(title => !(titleToKey(title) in globalVariables));
+
   const itemCount = listItems.filter(x => x.type === 'item').length;
 
   return (
@@ -554,18 +663,38 @@ export default function TextExpansions({
           </button>
         </div>
         <div className="te-header-right">
-          <span className="te-hint">
-            {panelMode === 'expansions' ? 'type trigger + Space' : 'corrects on Space'}
-          </span>
-          {panelMode === 'expansions' ? (
+          {panelMode !== 'globalvars' && (
+            <span className="te-hint">
+              {panelMode === 'expansions' ? 'type trigger + Space' : 'corrects on Space'}
+            </span>
+          )}
+          {panelMode === 'expansions' && (
             <button className="te-add-btn" onClick={openAdd} title="Add expansion" type="button">
               + Add
             </button>
-          ) : (
+          )}
+          {panelMode === 'autocorrect' && (
             <button className="te-add-btn" onClick={openAcAdd} title="Add custom correction" type="button">
               + Add
             </button>
           )}
+          {panelMode === 'globalvars' && (
+            <button className="te-add-btn" onClick={() => openGdAdd()} title="Add variable" type="button">
+              + Add Variable
+            </button>
+          )}
+          <button
+            className={`te-gv-link${panelMode === 'globalvars' ? ' active' : ''}`}
+            onClick={() => { setPanelMode('globalvars'); setGdEditing(null); }}
+            type="button"
+            title="Global Variables — reusable values inserted into expansions"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <rect x="1" y="1" width="10" height="10" rx="2"/>
+              <path d="M4 4h1M7 4h1M4 6h4M4 8h3"/>
+            </svg>
+            Global Variables
+          </button>
         </div>
       </div>
 
@@ -676,22 +805,32 @@ export default function TextExpansions({
                       className={`te-item${isEditingThis ? ' te-item-editing' : ''}`}
                       onClick={() => openEdit(exp)}
                     >
-                      <span className="te-item-name">{exp.displayName || exp.trigger}</span>
-                      <kbd className="te-trigger-badge">{exp.trigger}</kbd>
-                      {exp.triggerMode === 'immediate' && (
-                        <span className="te-immediate-badge" title="Fires instantly (no Space needed)">⚡</span>
-                      )}
-                      {exp.category && activeCategory === 'All' && (
-                        <span
-                          className="te-cat-badge"
-                          style={{ '--cat-color': color }}
-                          title={exp.category}
-                        >
-                          {exp.category}
-                        </span>
-                      )}
-                      <span className="te-item-arrow">→</span>
-                      <span className="te-replacement">{exp.text}</span>
+                      {/* Col 1 — Trigger */}
+                      <div className="te-col-trigger">
+                        <kbd className="te-trigger-badge">{exp.trigger}</kbd>
+                        {exp.triggerMode === 'immediate' && (
+                          <span className="te-immediate-badge" title="Fires instantly (no Space needed)">⚡</span>
+                        )}
+                      </div>
+                      {/* Col 2 — Name */}
+                      <div className="te-col-name">{exp.displayName || exp.trigger}</div>
+                      {/* Col 3 — Preview (plain text, truncated) */}
+                      <div className="te-col-preview">
+                        {(exp.text || '').replace(/\s+/g, ' ').trim()}
+                      </div>
+                      {/* Col 4 — Tag */}
+                      <div className="te-col-tag">
+                        {exp.category && (
+                          <span
+                            className="te-cat-badge"
+                            style={{ '--cat-color': color }}
+                            title={exp.category}
+                          >
+                            {exp.category}
+                          </span>
+                        )}
+                      </div>
+                      {/* Col 5 — Actions */}
                       <div className="te-item-actions">
                         <button
                           className="te-item-delete"
@@ -796,6 +935,7 @@ export default function TextExpansions({
                       key={editing.isNew ? '__new__' : editing.originalTrigger}
                       initialHtml={editorValue.html}
                       onChange={setEditorValue}
+                      globalVariables={globalVariables}
                     />
                   </div>
 
@@ -903,6 +1043,97 @@ export default function TextExpansions({
                     <button className="te-item-edit" onClick={() => openAcEdit(ac)} type="button">Edit</button>
                     <button className="te-item-delete" onClick={() => onDeleteAutocorrect?.(ac.typo)} type="button">✕</button>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════ GLOBAL VARIABLES VIEW ═══════════════════════════ */}
+      {panelMode === 'globalvars' && (
+        <div className="gd-view">
+          <div className="gd-helper">
+            Use <kbd className="te-trigger-badge">{'{{variable.key}}'}</kbd> in any expansion to insert the value automatically.
+            Keys are auto-generated from the display title — use the <strong>Insert</strong> button in the expansion editor to pick variables.
+          </div>
+
+          {/* Add / Edit form */}
+          {gdEditing && (
+            <div className="gd-form">
+              <div className="gd-form-fields">
+                <div className="gd-form-col">
+                  <label className="form-label">DISPLAY TITLE</label>
+                  <input
+                    className={`form-input${gdNameErr ? ' te-input-error' : ''}`}
+                    placeholder="e.g. My Full Name"
+                    value={gdTitle}
+                    onChange={e => {
+                      setGdTitle(e.target.value);
+                      setGdNameErr('');
+                    }}
+                    onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape') handleGdCancel(); }}
+                    autoFocus
+                    spellCheck={false}
+                  />
+                  {gdTitle.trim() && titleToKey(gdTitle.trim()) && (
+                    <span className="gd-key-hint">
+                      Will be inserted as <kbd className="te-trigger-badge gd-key-badge">{`{{${titleToKey(gdTitle.trim())}}}`}</kbd>
+                    </span>
+                  )}
+                  {gdNameErr && <span className="te-trigger-error">{gdNameErr}</span>}
+                </div>
+                <div className="gd-form-col gd-form-col-value">
+                  <label className="form-label">VALUE</label>
+                  <input
+                    className="form-input"
+                    placeholder="e.g. Rory Brady"
+                    value={gdValue}
+                    onChange={e => setGdValue(e.target.value)}
+                    onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') handleGdSave(); if (e.key === 'Escape') handleGdCancel(); }}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+              <div className="ac-form-footer">
+                <button className="te-cancel-btn" onClick={handleGdCancel} type="button">Cancel</button>
+                <button className="te-save-btn" onClick={handleGdSave} disabled={!canGdSave} type="button">Save</button>
+              </div>
+            </div>
+          )}
+
+          {/* Filled-in variables */}
+          {sortedGd.length > 0 && (
+            <div className="gd-list">
+              {sortedGd.map(([key, value]) => (
+                <div key={key} className="gd-item">
+                  <span className="gd-item-title">{keyToTitle(key)}</span>
+                  <span className="gd-item-value">{value}</span>
+                  <div className="te-item-actions">
+                    <button className="te-item-edit" onClick={() => openGdEdit(key)} type="button">Edit</button>
+                    <button className="te-item-delete" onClick={() => handleGdDelete(key)} type="button">✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Placeholder suggestions */}
+          {gdSuggestionsToShow.length > 0 && (
+            <div className="gd-suggestions">
+              {sortedGd.length > 0 && (
+                <div className="gd-suggestions-label">Suggested</div>
+              )}
+              {gdSuggestionsToShow.map(title => (
+                <div
+                  key={title}
+                  className="gd-item gd-item-placeholder"
+                  onClick={() => openGdAdd(title)}
+                  title={`Click to add "${title}"`}
+                >
+                  <span className="gd-item-title gd-placeholder-title">{title}</span>
+                  <span className="gd-placeholder-value">— not set</span>
+                  <span className="gd-placeholder-cta">+ Add</span>
                 </div>
               ))}
             </div>

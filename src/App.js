@@ -25,6 +25,7 @@ function App() {
   const [lastFired, setLastFired]           = useState(null);
   const [theme, setTheme]                   = useState('dark');
   const [expansionCategories, setExpansionCategories] = useState([]);
+  const [globalVariables, setGlobalVariables]         = useState({});   // { 'my.name': 'Rory Brady', … }
   const [activeView, setActiveView]                 = useState('keyboard'); // 'keyboard' | 'mouse'
   const [activeArea, setActiveArea]                 = useState('mapping');  // 'mapping' | 'expansions'
   const [numpadOpen, setNumpadOpen]                 = useState(false);
@@ -83,6 +84,7 @@ function App() {
         setTheme(savedTheme);
         document.documentElement.setAttribute('data-theme', savedTheme);
         setExpansionCategories(config.expansionCategories || []);
+        setGlobalVariables(config.globalVariables || {});
         const savedAcEnabled = config.autocorrectEnabled ?? false;
         setAutocorrectEnabled(savedAcEnabled);
         if (savedAcEnabled) {
@@ -207,9 +209,14 @@ function App() {
   }, []);
 
   const saveConfig = useCallback((newAssignments, newProfiles, newProfile) => {
-    window.electronAPI?.saveConfig({ assignments: newAssignments, profiles: newProfiles, activeProfile: newProfile, activeGlobalProfile, profileSettings, theme, expansionCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
+    window.electronAPI?.saveConfig({ assignments: newAssignments, profiles: newProfiles, activeProfile: newProfile, activeGlobalProfile, profileSettings, theme, expansionCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true, globalVariables });
     syncEngine(newAssignments, newProfile);
-  }, [syncEngine, activeGlobalProfile, profileSettings, theme, expansionCategories, autocorrectEnabled, macrosEnabledOnStartup]);
+  }, [syncEngine, activeGlobalProfile, profileSettings, theme, expansionCategories, autocorrectEnabled, macrosEnabledOnStartup, globalVariables]);
+
+  const handleSaveGlobalVariables = useCallback((newVars) => {
+    setGlobalVariables(newVars);
+    window.electronAPI?.saveConfig({ assignments, profiles, activeProfile, activeGlobalProfile, profileSettings, theme, expansionCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true, globalVariables: newVars });
+  }, [assignments, profiles, activeProfile, activeGlobalProfile, profileSettings, theme, expansionCategories, autocorrectEnabled, macrosEnabledOnStartup]);
 
   // ── Notifications ─────────────────────────────────────────
   const showNotification = useCallback((msg, type = 'success') => {
@@ -989,6 +996,8 @@ function App() {
               autocorrections={autocorrections}
               onAddAutocorrect={handleAddAutocorrect}
               onDeleteAutocorrect={handleDeleteAutocorrect}
+              globalVariables={globalVariables}
+              onSaveGlobalVariables={handleSaveGlobalVariables}
             />
           )}
         </main>

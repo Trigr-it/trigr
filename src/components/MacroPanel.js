@@ -415,82 +415,97 @@ function MacroSequenceForm({ value, onChange, globalInputMethod }) {
           <Fragment key={i}>
             {showLineAt(i) && <div className="step-drop-line" />}
             <div
-              className={`macro-step${dragIndex === i ? ' macro-step-dragging' : ''}`}
+              className={`macro-step${dragIndex === i ? ' macro-step-dragging' : ''}${step.type === 'Wait for Input' ? ' macro-step-wfi' : ''}`}
               onDragOver={e => handleDragOver(e, i)}
               onDrop={handleDrop}
             >
-              <div
-                className="step-drag-handle"
-                draggable
-                onDragStart={e => handleDragStart(e, i)}
-                onDragEnd={handleDragEnd}
-                title="Drag to reorder"
-              >
-                ⠿
+              {/* Row 1: drag handle, step number, type dropdown, value/delete */}
+              <div className="macro-step-row">
+                <div
+                  className="step-drag-handle"
+                  draggable
+                  onDragStart={e => handleDragStart(e, i)}
+                  onDragEnd={handleDragEnd}
+                  title="Drag to reorder"
+                >
+                  ⠿
+                </div>
+                <div className="macro-step-num">{i + 1}</div>
+                <select
+                  className="form-select macro-step-type"
+                  value={step.type}
+                  onChange={e => updateStep(i, { ...step, type: e.target.value })}
+                >
+                  {MACRO_STEP_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+                {step.type !== 'Wait for Input' && (
+                  step.type === 'Press Key' ? (
+                    <KeyCaptureInput
+                      value={step.value || ''}
+                      onChange={v => updateStep(i, { ...step, value: v })}
+                    />
+                  ) : (
+                    <input
+                      className="form-input macro-step-value"
+                      placeholder={
+                        step.type === 'Wait (ms)' ? '500' :
+                        step.type === 'Open URL'  ? 'https://...' :
+                        'Text to type...'
+                      }
+                      value={step.value || ''}
+                      onChange={e => updateStep(i, { ...step, value: e.target.value })}
+                    />
+                  )
+                )}
+                <button className="step-remove" onClick={() => removeStep(i)} type="button">✕</button>
               </div>
-              <div className="macro-step-num">{i + 1}</div>
-              <select
-                className="form-select macro-step-type"
-                value={step.type}
-                onChange={e => updateStep(i, { ...step, type: e.target.value })}
-              >
-                {MACRO_STEP_TYPES.map(t => <option key={t}>{t}</option>)}
-              </select>
-              {step.type === 'Wait for Input' ? (() => {
+              {/* Row 2 (Wait for Input only): labelled config dropdowns */}
+              {step.type === 'Wait for Input' && (() => {
                 let wfi = { inputType: 'LButton', trigger: 'press', specificKey: '' };
                 try { wfi = { ...wfi, ...JSON.parse(step.value || '{}') }; } catch (_) {}
                 const updateWfi = (patch) => {
                   const next = { ...wfi, ...patch };
-                  // Clear specificKey if the input type is no longer SpecificKey
                   if (patch.inputType && patch.inputType !== 'SpecificKey') next.specificKey = '';
                   updateStep(i, { ...step, value: JSON.stringify(next) });
                 };
                 return (
-                  <div className="wfi-controls macro-step-value">
-                    <select
-                      className="form-select"
-                      value={wfi.inputType}
-                      onChange={e => updateWfi({ inputType: e.target.value })}
-                    >
-                      {WFI_INPUT_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="form-select"
-                      value={wfi.trigger}
-                      onChange={e => updateWfi({ trigger: e.target.value })}
-                    >
-                      {WFI_TRIGGER_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                  <div className="wfi-config-row">
+                    <div className="wfi-field">
+                      <span className="wfi-label">Wait for:</span>
+                      <select
+                        className="form-select wfi-select"
+                        value={wfi.inputType}
+                        onChange={e => updateWfi({ inputType: e.target.value })}
+                      >
+                        {WFI_INPUT_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="wfi-field">
+                      <span className="wfi-label">Trigger:</span>
+                      <select
+                        className="form-select wfi-select"
+                        value={wfi.trigger}
+                        onChange={e => updateWfi({ trigger: e.target.value })}
+                      >
+                        {WFI_TRIGGER_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
                     {wfi.inputType === 'SpecificKey' && (
-                      <KeyCaptureInput
-                        value={wfi.specificKey || ''}
-                        onChange={v => updateWfi({ specificKey: v })}
-                      />
+                      <div className="wfi-field">
+                        <span className="wfi-label">Key:</span>
+                        <KeyCaptureInput
+                          value={wfi.specificKey || ''}
+                          onChange={v => updateWfi({ specificKey: v })}
+                        />
+                      </div>
                     )}
                   </div>
                 );
-              })() : step.type === 'Press Key' ? (
-                <KeyCaptureInput
-                  value={step.value || ''}
-                  onChange={v => updateStep(i, { ...step, value: v })}
-                />
-              ) : (
-                <input
-                  className="form-input macro-step-value"
-                  placeholder={
-                    step.type === 'Wait (ms)' ? '500' :
-                    step.type === 'Open URL'  ? 'https://...' :
-                    'Text to type...'
-                  }
-                  value={step.value || ''}
-                  onChange={e => updateStep(i, { ...step, value: e.target.value })}
-                />
-              )}
-              <button className="step-remove" onClick={() => removeStep(i)} type="button">✕</button>
+              })()}
             </div>
           </Fragment>
         ))}

@@ -63,6 +63,7 @@ window.electronAPI = {
   // Settings — startup
   getStartupEnabled:  ()        => ipcRenderer.invoke('get-startup-enabled'),
   setStartupEnabled:  (enabled) => ipcRenderer.send('set-startup-enabled', enabled),
+  getAppVersion:      ()        => ipcRenderer.invoke('get-app-version'),
 
   // Help
   openHelp:     ()    => ipcRenderer.send('open-help'),

@@ -6,6 +6,15 @@ const { autoUpdater } = require('electron-updater');
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+// Windows taskbar identity — must be set before app.whenReady()
+app.setAppUserModelId('com.trigr.app');
+
+// ── Chromium memory optimisations ────────────────────────────────────────────
+// Must be set before app.whenReady().
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128');  // cap each renderer's V8 old-space heap
+app.commandLine.appendSwitch('disable-http-cache');                    // no on-disk HTTP cache
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');         // no shader disk cache
+
 let mainWindow;
 let overlayWindow         = null;
 let overlayHotkeyId       = null;  // numeric ID used with RegisterHotKey
@@ -390,12 +399,16 @@ const OVERLAY_HOTKEY_ID     = 0xFFFF; // fixed ID reserved for the overlay toggl
 // key suppression on top: registered hotkeys are intercepted before the
 // foreground app sees them, so no Backspace-erase workaround is needed.
 // ─────────────────────────────────────────────
-let koffiAvailable           = false;
-let koffiRegisterHotKey      = null;
-let koffiUnregisterHotKey    = null;
-let koffiGetForegroundWindow = null;
-let koffiSetForegroundWindow = null;
-let koffiSendInput           = null;
+let koffiAvailable                  = false;
+let koffiRegisterHotKey             = null;
+let koffiUnregisterHotKey           = null;
+let koffiGetForegroundWindow        = null;
+let koffiSetForegroundWindow        = null;
+let koffiSendInput                  = null;
+let koffiGetWindowThreadProcessId   = null;
+let koffiOpenProcess                = null;
+let koffiQueryFullProcessImageNameW = null;
+let koffiCloseHandle                = null;
 
 function loadKoffi() {
   if (process.platform !== 'win32') return;
@@ -408,8 +421,14 @@ function loadKoffi() {
     koffiGetForegroundWindow = user32.func('uint64 GetForegroundWindow()');
     koffiSetForegroundWindow = user32.func('bool SetForegroundWindow(uint64 hwnd)');
     koffiSendInput           = user32.func('uint32 SendInput(uint32 cInputs, void *pInputs, int32 cbSize)');
+    // For native foreground-process detection (replaces PowerShell watcher subprocess)
+    koffiGetWindowThreadProcessId   = user32.func('uint32 GetWindowThreadProcessId(uint64 hwnd, void *lpdwProcessId)');
+    const kernel32 = koffi.load('kernel32.dll');
+    koffiOpenProcess                = kernel32.func('uint64 OpenProcess(uint32 dwDesiredAccess, bool bInheritHandle, uint32 dwProcessId)');
+    koffiQueryFullProcessImageNameW = kernel32.func('bool QueryFullProcessImageNameW(uint64 hProcess, uint32 dwFlags, void *lpExeName, void *lpdwSize)');
+    koffiCloseHandle                = kernel32.func('bool CloseHandle(uint64 hObject)');
     koffiAvailable = true;
-    console.log('[KeyForge] koffi / user32 loaded ✓');
+    console.log('[KeyForge] koffi / user32 + kernel32 loaded ✓');
   } catch (e) {
     console.warn('[KeyForge] koffi not available — OS hotkey suppression disabled:', e.message);
   }
@@ -742,10 +761,12 @@ function loadUiohook() {
   }
 }
 
+let _nutjsLoadAttempted = false;
 function loadNutjs() {
+  if (_nutjsLoadAttempted) return;
+  _nutjsLoadAttempted = true;
   try {
     nutjs = require('@nut-tree-fork/nut-js');
-    // Speed up typing
     nutjs.keyboard.config.autoDelayMs = 0;
     nutjsAvailable = true;
     console.log('[KeyForge] nut-js loaded ✓');
@@ -1150,6 +1171,7 @@ function createFillInWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      backgroundThrottling: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -1160,13 +1182,22 @@ function createFillInWindow() {
     fillInWindow.loadFile(path.join(__dirname, '../build/index.html'), { query: { fillin: '1' } });
   }
 
-  fillInWindow.on('closed', () => {
-    // If the OS closed the window without a submit (e.g. Alt+F4), clean up the
-    // pending state and orphaned submit listener so the next trigger works.
-    if (_fillInSubmitHandler) {
-      ipcMain.removeListener('fill-in-submit', _fillInSubmitHandler);
-      _fillInSubmitHandler = null;
+  // Intercept close (Alt+F4, etc.) — hide instead of destroy so the renderer
+  // stays loaded for fast reuse on subsequent fill-in triggers.
+  fillInWindow.on('close', (e) => {
+    if (!isQuitting && fillInWindow && !fillInWindow.isDestroyed()) {
+      e.preventDefault();
+      fillInWindow.hide();
+      if (_fillInSubmitHandler) {
+        ipcMain.removeListener('fill-in-submit', _fillInSubmitHandler);
+        _fillInSubmitHandler = null;
+      }
+      fillInPending = false;
     }
+  });
+
+  fillInWindow.on('closed', () => {
+    // Fires only during app quit (isQuitting=true) — clean up state.
     fillInWindow      = null;
     fillInWindowReady = false;
     fillInPending     = false;
@@ -1274,6 +1305,19 @@ function _promptFillInAll(labels) {
 // characters to move the cursor left after pasting (for {cursor}).
 async function _resolveTokens(plainText, htmlContent) {
   const now = new Date();
+
+  // ── 0. Substitute {{varName}} global variables ────────────────────────────
+  // Defined variables are replaced silently; unknown variables fall through to
+  // the fill-in prompt system by being converted to {fillIn:varName}.
+  const globalVariables = loadConfig()?.globalVariables || {};
+  if (plainText.includes('{{')) {
+    const substituteGv = (str) =>
+      str.replace(/\{\{([a-z][a-z0-9._]*)\}\}/g, (_, name) =>
+        name in globalVariables ? globalVariables[name] : `{fillIn:${name}}`
+      );
+    plainText    = substituteGv(plainText);
+    if (htmlContent) htmlContent = substituteGv(htmlContent);
+  }
 
   // ── 1. Collect and resolve all fill-in fields (async, user-prompted) ──────
   // Gather unique labels in order of first appearance
@@ -1826,29 +1870,50 @@ function stopHotkeyListener() {
 
 // ─────────────────────────────────────────────
 // FOREGROUND WINDOW WATCHER (Windows only)
-// Spawns a single persistent PowerShell process that polls every 500 ms and
-// outputs the foreground process name to stdout.  Much cheaper than spawning
-// a new process on each tick.
+// Uses a setInterval + native koffi Win32 calls in-process.
+// GetForegroundWindow() fires every 1500 ms (one cheap syscall).
+// GetWindowThreadProcessId / OpenProcess / QueryFullProcessImageNameW only
+// run when the HWND actually changes — i.e. when the user switches apps.
+// This replaces a persistent PowerShell subprocess that called Get-Process
+// (iterates all system processes) every 500 ms, causing continuous CPU drain.
 // ─────────────────────────────────────────────
 
-// Pre-encode the PS watcher script at startup (same Base64 UTF-16LE trick as _FG_CMD).
-const _FG_WATCHER_SCRIPT = `
-Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class KFUser32 { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId); }' -ErrorAction SilentlyContinue
-while ($true) {
-  try {
-    $hwnd   = [KFUser32]::GetForegroundWindow()
-    $fgPid  = [uint32]0
-    [KFUser32]::GetWindowThreadProcessId($hwnd, [ref]$fgPid) | Out-Null
-    $proc   = Get-Process -Id $fgPid -ErrorAction SilentlyContinue
-    if ($proc -and $proc.ProcessName) { Write-Output $proc.ProcessName } else { Write-Output '' }
-  } catch { Write-Output '' }
-  Start-Sleep -Milliseconds 500
-}`.trim();
-const _FG_WATCHER_ENCODED = Buffer.from(_FG_WATCHER_SCRIPT, 'utf16le').toString('base64');
+const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 
-let fgWatcher     = null;
-let fgWatcherBuf  = '';
-let currentFgProc = ''; // lowercase, .exe-stripped — updated by handleForegroundChange
+let fgWatcher     = null;  // setInterval handle
+let _lastFgHwnd   = 0n;    // last seen HWND — skip expensive lookup when unchanged
+let currentFgProc = '';    // lowercase, .exe-stripped — updated by handleForegroundChange
+
+// Resolve a foreground HWND to a process base name (no extension, lowercase).
+// Only called when the HWND has changed from the previous tick.
+function _getFgProcName(hwnd) {
+  if (!koffiGetWindowThreadProcessId || !koffiOpenProcess ||
+      !koffiQueryFullProcessImageNameW || !koffiCloseHandle) return '';
+  try {
+    const pidBuf = Buffer.alloc(4);
+    koffiGetWindowThreadProcessId(hwnd, pidBuf);
+    const pid = pidBuf.readUInt32LE(0);
+    if (!pid) return '';
+
+    const hProc = koffiOpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+    if (!hProc) return '';
+    try {
+      const MAX_PATH  = 260;
+      const nameBuf   = Buffer.alloc(MAX_PATH * 2); // UTF-16LE, 2 bytes per char
+      const sizeBuf   = Buffer.alloc(4);
+      sizeBuf.writeUInt32LE(MAX_PATH, 0);
+      const ok = koffiQueryFullProcessImageNameW(hProc, 0, nameBuf, sizeBuf);
+      if (!ok) return '';
+      const len      = sizeBuf.readUInt32LE(0);
+      const fullPath = nameBuf.slice(0, len * 2).toString('utf16le');
+      return path.basename(fullPath, '.exe').toLowerCase();
+    } finally {
+      koffiCloseHandle(hProc);
+    }
+  } catch (e) {
+    return '';
+  }
+}
 
 // Process names that identify KeyForge itself (dev: electron, packaged: exe stem).
 const _SELF_PROC_NAMES = new Set([
@@ -1898,35 +1963,24 @@ function handleForegroundChange(procName) {
 }
 
 function startFgWatcher() {
-  if (process.platform !== 'win32' || fgWatcher) return;
-  fgWatcher = spawn('powershell', [
-    '-NoProfile', '-NonInteractive', '-EncodedCommand', _FG_WATCHER_ENCODED,
-  ], { stdio: ['ignore', 'pipe', 'ignore'] });
-
-  fgWatcher.stdout.on('data', chunk => {
-    fgWatcherBuf += chunk.toString();
-    const lines = fgWatcherBuf.split('\n');
-    fgWatcherBuf = lines.pop(); // keep any incomplete last line
-    for (const line of lines) {
-      const name = line.trim();
+  if (process.platform !== 'win32' || fgWatcher || !koffiAvailable) return;
+  fgWatcher = setInterval(() => {
+    try {
+      const hwnd = koffiGetForegroundWindow();
+      if (!hwnd || hwnd === _lastFgHwnd) return; // no change — skip expensive lookup
+      _lastFgHwnd = hwnd;
+      const name = _getFgProcName(hwnd);
       if (name) handleForegroundChange(name);
-    }
-  });
-
-  fgWatcher.on('exit', () => {
-    fgWatcher    = null;
-    fgWatcherBuf = '';
-    console.log('[KeyForge] Foreground watcher exited');
-  });
-
-  console.log('[KeyForge] Foreground watcher started ✓');
+    } catch (e) { /* ignore transient API errors */ }
+  }, 1500);
+  console.log('[KeyForge] Foreground watcher started (native koffi, 1500ms) ✓');
 }
 
 function stopFgWatcher() {
   if (fgWatcher) {
-    fgWatcher.kill();
-    fgWatcher    = null;
-    fgWatcherBuf = '';
+    clearInterval(fgWatcher);
+    fgWatcher   = null;
+    _lastFgHwnd = 0n;
   }
 }
 
@@ -1934,7 +1988,7 @@ function stopFgWatcher() {
 // STARTUP REGISTRY (Windows only)
 // ─────────────────────────────────────────────
 const REG_RUN  = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
-const REG_NAME = 'KeyForge';
+const REG_NAME = 'Trigr';
 
 function getStartupEnabled(callback) {
   if (process.platform !== 'win32' || !app.isPackaged) return callback(false);
@@ -1957,6 +2011,7 @@ function setStartupEnabled(enable) {
 // ─────────────────────────────────────────────
 function showWindow() {
   if (mainWindow) {
+    mainWindow.webContents.setBackgroundThrottling(false);
     mainWindow.show();
     mainWindow.focus();
   } else {
@@ -1966,12 +2021,13 @@ function showWindow() {
 
 function hideWindowToTray() {
   if (!mainWindow) return;
+  mainWindow.webContents.setBackgroundThrottling(true);
   mainWindow.hide();
   if (!hasShownBalloon && tray && process.platform === 'win32') {
     hasShownBalloon = true;
     tray.displayBalloon({
-      title:    'KeyForge',
-      content:  'KeyForge is still running in the background. Your macros are active.',
+      title:    'Trigr',
+      content:  'Trigr is still running in the background. Your macros are active.',
       iconType: 'info',
     });
   }
@@ -1981,7 +2037,7 @@ function buildTrayMenu() {
   getStartupEnabled((startupOn) => {
     const menu = Menu.buildFromTemplate([
       {
-        label: 'Open KeyForge',
+        label: 'Open Trigr',
         click: showWindow,
       },
       { type: 'separator' },
@@ -2003,7 +2059,7 @@ function buildTrayMenu() {
       },
       { type: 'separator' },
       {
-        label: 'Quit KeyForge',
+        label: 'Quit Trigr',
         click: () => {
           isQuitting = true;
           app.quit();
@@ -2021,7 +2077,7 @@ function createTray() {
 
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon);
-  tray.setToolTip('KeyForge — Macro Engine Active'); // updateTrayTooltip() called after tray is set
+  tray.setToolTip('Trigr — Macro Engine Active'); // updateTrayTooltip() called after tray is set
   tray.on('click', showWindow);
   buildTrayMenu();
   console.log('[KeyForge] System tray created ✓');
@@ -2324,6 +2380,8 @@ ipcMain.handle('get-startup-enabled', () =>
   new Promise(resolve => getStartupEnabled(resolve))
 );
 
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 ipcMain.on('set-startup-enabled', (_event, enabled) => {
   setStartupEnabled(!!enabled);
   console.log(`[KeyForge] Start with Windows: ${enabled ? 'enabled' : 'disabled'}`);
@@ -2333,7 +2391,7 @@ ipcMain.on('set-startup-enabled', (_event, enabled) => {
 ipcMain.handle('export-config', async () => {
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: 'Export KeyForge Config',
+    title: 'Export Trigr Config',
     defaultPath: path.join(app.getPath('desktop'), `keyforge-backup-${today}.json`),
     filters: [{ name: 'JSON', extensions: ['json'] }],
   });
@@ -2352,7 +2410,7 @@ ipcMain.handle('export-config', async () => {
 // ── Backup: import config ────────────────────────────────────────────────
 ipcMain.handle('import-config', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: 'Import KeyForge Config',
+    title: 'Import Trigr Config',
     properties: ['openFile'],
     filters: [{ name: 'JSON', extensions: ['json'] }],
   });
@@ -2362,7 +2420,7 @@ ipcMain.handle('import-config', async () => {
     const config = JSON.parse(raw);
     // Basic structure validation — must have an assignments object
     if (typeof config !== 'object' || config === null || typeof config.assignments !== 'object') {
-      return { ok: false, error: 'Invalid KeyForge config file — missing assignments object.' };
+      return { ok: false, error: 'Invalid Trigr config file — missing assignments object.' };
     }
     // Backup current config before overwriting so the import is always recoverable
     const current = loadConfig();
@@ -2455,6 +2513,7 @@ function createOverlayWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      backgroundThrottling: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -2680,9 +2739,8 @@ function createWindow() {
       searchOverlayHotkey = migratedHotkey;
     }
     registerOverlayHotkey(searchOverlayHotkey);
-
-    // Pre-create the overlay window so it's ready when first needed
-    createOverlayWindow();
+    // Overlay window is created lazily on first use (showOverlay → createOverlayWindow)
+    // to avoid a hidden renderer process consuming ~150MB at startup.
   });
 
   // Clear input-focus guard whenever the window loses OS focus so macros fire
@@ -2742,13 +2800,37 @@ ipcMain.on('install-update', () => {
 app.whenReady().then(() => {
   loadKoffi();
   loadUiohook();
-  loadNutjs();
+  loadNutjs(); // load eagerly so status bar reflects correct state on startup
   createWindow();
   createTray();
   startFgWatcher();
   if (!isDev) {
     initAutoUpdater();
   }
+
+  // Window audit — logs open BrowserWindows 5 s after startup.
+  // Remove once process count is confirmed stable.
+  setTimeout(() => {
+    const wins = BrowserWindow.getAllWindows();
+    console.log(`[KeyForge] Window audit: ${wins.length} BrowserWindow(s) open:`);
+    wins.forEach((w, i) => {
+      console.log(`  [${i}] title="${w.getTitle()}" url=${w.webContents.getURL()} visible=${w.isVisible()}`);
+    });
+  }, 5000);
+
+  // CPU/RAM audit — logs per-process metrics every 30 s so we can spot which
+  // process is burning CPU when Trigr is idle. Remove once usage is confirmed low.
+  setInterval(() => {
+    try {
+      const mem = process.memoryUsage();
+      console.log(`[RAM] main process — RSS: ${Math.round(mem.rss / 1024 / 1024)}MB  heap: ${Math.round(mem.heapUsed / 1024 / 1024)}MB`);
+      const metrics = app.getAppMetrics();
+      const lines = metrics.map(m =>
+        `  [${m.type}] pid=${m.pid} cpu=${m.cpu.percentCPUUsage.toFixed(1)}% mem=${Math.round(m.memory.workingSetSize / 1024)}MB`
+      );
+      console.log('[KeyForge] CPU/RAM audit:\n' + lines.join('\n'));
+    } catch (e) { /* ignore */ }
+  }, 30000);
 });
 
 app.on('window-all-closed', () => {
@@ -2772,6 +2854,10 @@ app.on('before-quit', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.destroy();
     overlayWindow = null;
+  }
+  if (fillInWindow && !fillInWindow.isDestroyed()) {
+    fillInWindow.destroy();
+    fillInWindow = null;
   }
   tray?.destroy();
   tray = null;

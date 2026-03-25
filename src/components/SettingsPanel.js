@@ -32,10 +32,12 @@ export default function SettingsPanel({
   const [capturedHotkey, setCapturedHotkey]   = useState(null); // { combo, label } during capture
   const [backupList, setBackupList]           = useState(null);  // null = not loaded yet
   const [confirmRestore, setConfirmRestore]   = useState(null);  // filename pending confirm
+  const [appVersion, setAppVersion]           = useState('');
 
   useEffect(() => {
     window.electronAPI?.getConfigPath().then(p  => setConfigPath(p || ''));
     window.electronAPI?.getStartupEnabled().then(v => setStartWithWindows(!!v));
+    window.electronAPI?.getAppVersion().then(v => setAppVersion(v || ''));
   }, []);
 
   function loadBackups() {
@@ -132,7 +134,7 @@ export default function SettingsPanel({
           <div className="settings-about">
             <div className="settings-about-header">
               <span className="settings-about-name">Trigr</span>
-              <span className="settings-about-version">v1.0.0</span>
+              <span className="settings-about-version">{appVersion ? `v${appVersion}` : ''}</span>
             </div>
             <p className="settings-about-desc">Keyboard macro manager with global hotkeys, text expansions and autocorrect — all stored locally on your device.</p>
           </div>

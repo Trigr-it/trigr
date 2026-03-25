@@ -21,7 +21,8 @@
 }
 
 .main-area--expansions .te-body,
-.main-area--expansions .ac-view {
+.main-area--expansions .ac-view,
+.main-area--expansions .gd-view {
   flex: 1;
   min-height: 0;
 }
@@ -78,6 +79,44 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Global Variables link — right-aligned, text-link style, visually separated */
+.te-gv-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 8px 0 12px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border-bright);
+  margin-left: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: color 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.te-gv-link:hover {
+  color: var(--text-secondary);
+}
+
+.te-gv-link.active {
+  color: var(--accent);
+}
+
+.te-gv-link svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.te-gv-link.active svg {
+  opacity: 1;
 }
 
 .te-hint {
@@ -419,17 +458,20 @@
   margin-left: 4px;
 }
 
-/* Compact row — target ~36px height for maximum density */
+/* Grid row — four fixed columns: Trigger | Name | Preview | Tag | Actions
+   Columns: 120px 180px 1fr 100px 28px
+   Every cell in every row starts at exactly the same x position. */
 .te-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 120px 180px 1fr 100px 28px;
   align-items: center;
-  gap: 7px;
   height: 36px;
-  padding: 0 10px 0 12px;
+  padding: 0 4px 0 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   transition: background 0.1s;
   cursor: pointer;
+  min-width: 0;
 }
 
 .te-item:hover {
@@ -439,6 +481,47 @@
 .te-item-editing {
   background: var(--accent-glow) !important;
   border-bottom-color: var(--border-accent);
+}
+
+/* Col 1 — Trigger */
+.te-col-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+/* Col 2 — Name */
+.te-col-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 10px;
+  min-width: 0;
+}
+
+/* Col 3 — Preview */
+.te-col-preview {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+/* Col 4 — Tag */
+.te-col-tag {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  min-width: 0;
 }
 
 .te-trigger-badge {
@@ -454,6 +537,9 @@
   letter-spacing: 0.04em;
   white-space: nowrap;
   flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .te-immediate-badge {
@@ -475,6 +561,9 @@
   letter-spacing: 0.04em;
   white-space: nowrap;
   flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: color-mix(in srgb, var(--cat-color) 15%, transparent);
   color: var(--cat-color);
   border: 1px solid color-mix(in srgb, var(--cat-color) 35%, transparent);
@@ -486,25 +575,24 @@
   flex-shrink: 0;
 }
 
+/* .te-replacement kept for any legacy references; not used in list rows */
 .te-replacement {
-  flex: 1;
   min-width: 0;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Display name — primary label on the left, fixed max-width with truncation */
+/* .te-item-name kept for any legacy references; not used in list rows */
 .te-item-name {
   flex-shrink: 0;
-  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 /* Action buttons — hidden by default, revealed on row hover or when editing */
@@ -932,10 +1020,22 @@
   flex-shrink: 0;
 }
 
-.rte-chip-clipboard { background: rgba(100,180,255,0.15); color: #64b4ff; border: 1px solid rgba(100,180,255,0.35); }
-.rte-chip-date      { background: rgba(80,200,120,0.12);  color: #50c878; border: 1px solid rgba(80,200,120,0.35);  }
-.rte-chip-cursor    { background: rgba(255,200,50,0.12);  color: #ffc832; border: 1px solid rgba(255,200,50,0.35);  }
-.rte-chip-fillin    { background: rgba(200,100,255,0.12); color: #c864ff; border: 1px solid rgba(200,100,255,0.35); }
+.rte-chip-clipboard  { background: rgba(100,180,255,0.15); color: #64b4ff; border: 1px solid rgba(100,180,255,0.35); }
+.rte-chip-date       { background: rgba(80,200,120,0.12);  color: #50c878; border: 1px solid rgba(80,200,120,0.35);  }
+.rte-chip-cursor     { background: rgba(255,200,50,0.12);  color: #ffc832; border: 1px solid rgba(255,200,50,0.35);  }
+.rte-chip-fillin     { background: rgba(200,100,255,0.12); color: #c864ff; border: 1px solid rgba(200,100,255,0.35); }
+.rte-chip-globalvar  { background: rgba(232,160,32,0.12);  color: #e8a020; border: 1px solid rgba(232,160,32,0.35);  }
+
+/* Section label inside the insert dropdown */
+.rte-menu-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 5px 8px 2px;
+  opacity: 0.7;
+}
 
 /* Fill-in label entry row inside the dropdown */
 .rte-fillin-row {
@@ -1029,6 +1129,13 @@
   background: rgba(200, 100, 255, 0.12);
   border-color: rgba(200, 100, 255, 0.35);
   color: #c864ff;
+}
+
+/* Global variable tokens {{key}} → amber */
+.rte-token[data-token^="{{"] {
+  background: rgba(232, 160, 32, 0.12);
+  border-color: rgba(232, 160, 32, 0.35);
+  color: #e8a020;
 }
 
 /* ── Rich Text Editor ───────────────────────────────────────────────────── */
@@ -1377,4 +1484,182 @@
 .te-delete-confirm-btn:hover {
   background: rgba(255, 80, 80, 0.22);
   border-color: rgba(255, 80, 80, 0.6);
+}
+
+/* ════════════════════════════════════ GLOBAL VARIABLES ════════════════════════════════ */
+
+.gd-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.gd-helper {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.5;
+}
+
+.gd-helper kbd {
+  font-size: 11px;
+}
+
+.gd-helper strong {
+  color: var(--text-primary);
+}
+
+.gd-form {
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px 10px;
+}
+
+.gd-form-fields {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.gd-form-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 130px;
+}
+
+.gd-form-col-value {
+  flex: 1.5;
+}
+
+/* Auto-generated key hint below Display Title field */
+.gd-key-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 1px;
+}
+
+.gd-key-badge {
+  font-size: 10px !important;
+  padding: 1px 5px !important;
+}
+
+/* Variable list */
+.gd-list {
+  flex-shrink: 0;
+}
+
+.gd-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 40px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+  cursor: default;
+}
+
+.gd-item:hover {
+  background: var(--bg-hover);
+}
+
+.gd-item:hover .te-item-actions {
+  opacity: 1;
+}
+
+.gd-item-title {
+  width: 42%;
+  min-width: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gd-item-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+}
+
+/* Placeholder suggestion rows */
+.gd-suggestions {
+  flex-shrink: 0;
+}
+
+.gd-suggestions-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 8px 16px 4px;
+  opacity: 0.65;
+}
+
+.gd-item-placeholder {
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.gd-item-placeholder:hover {
+  opacity: 0.8;
+  background: var(--bg-hover);
+}
+
+.gd-placeholder-title {
+  color: var(--text-muted) !important;
+  font-weight: 400 !important;
+}
+
+.gd-placeholder-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  font-style: italic;
+}
+
+.gd-placeholder-cta {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  opacity: 0;
+  padding: 0 4px;
+  font-family: var(--font-body);
+  flex-shrink: 0;
+  transition: opacity 0.12s;
+}
+
+.gd-item-placeholder:hover .gd-placeholder-cta {
+  opacity: 1;
+}
+
+/* legacy — keep for any residual references */
+.gd-value {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
