@@ -57,14 +57,39 @@ const GD_SUGGESTIONS = [
   'My Phone Number', 'My Company', 'My Job Title', 'My Website',
 ];
 
-// Generate a consistent colour from a category name
-function categoryColor(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name.charCodeAt(i) + ((hash << 5) - hash)) | 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 58%, 52%)`;
+// ── Category colour preset palette ─────────────────────────────────────────
+const CATEGORY_COLOURS = [
+  { hex: null,      label: 'None'   },
+  { hex: '#E8A020', label: 'Amber'  },
+  { hex: '#E84040', label: 'Red'    },
+  { hex: '#2ECC71', label: 'Green'  },
+  { hex: '#4080E8', label: 'Blue'   },
+  { hex: '#9B59B6', label: 'Purple' },
+  { hex: '#1ABC9C', label: 'Teal'   },
+  { hex: '#E86020', label: 'Orange' },
+  { hex: '#E840A0', label: 'Pink'   },
+  { hex: '#5C6AE8', label: 'Indigo' },
+  { hex: '#80C820', label: 'Lime'   },
+  { hex: '#20B8E8', label: 'Cyan'   },
+  { hex: '#E84060', label: 'Rose'   },
+];
+
+function ColourPicker({ value, onChange }) {
+  return (
+    <div className="cat-colour-picker">
+      {CATEGORY_COLOURS.map((c, i) => (
+        <button
+          key={i}
+          type="button"
+          className={`cat-colour-swatch${value === c.hex ? ' selected' : ''}`}
+          style={c.hex ? { '--swatch-color': c.hex } : {}}
+          onMouseDown={e => e.preventDefault()}
+          onClick={() => onChange(c.hex)}
+          title={c.label}
+        />
+      ))}
+    </div>
+  );
 }
 
 // ── Rich text editor ───────────────────────────────────────────────────────
@@ -415,6 +440,7 @@ export default function TextExpansions({
   onAddCategory,
   onDeleteCategory,
   onReorderCategories,
+  onUpdateCategoryColour,
   // Autocorrect props
   autocorrectEnabled,
   onToggleAutocorrect,
@@ -440,10 +466,14 @@ export default function TextExpansions({
   const [triggerError, setTriggerError] = useState('');
 
   // ── Category bar state ──
-  const [activeCategory, setActiveCategory]   = useState('All');
-  const [addingCategory, setAddingCategory]   = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [activeCategory, setActiveCategory]     = useState('All');
+  const [addingCategory, setAddingCategory]     = useState(false);
+  const [newCategoryName, setNewCategoryName]   = useState('');
+  const [newCategoryColour, setNewCategoryColour] = useState(null);
   const [pendingDeleteCat, setPendingDeleteCat] = useState(null);
+  // ── Category colour picker popover ──
+  const [catColourPopover, setCatColourPopover] = useState(null); // { forCat, x, y }
+  const catColourPopoverRef = useRef(null);
   const [deleteConfirm, setDeleteConfirm]       = useState(null); // trigger string awaiting confirmation
 
   // ── Category drag-and-drop state ──
@@ -477,10 +507,21 @@ export default function TextExpansions({
 
   // If the active category is deleted, fall back to All
   useEffect(() => {
-    if (activeCategory !== 'All' && !categories.includes(activeCategory)) {
+    if (activeCategory !== 'All' && activeCategory !== '__uncategorised__' &&
+        !categories.some(c => c.name === activeCategory)) {
       setActiveCategory('All');
     }
   }, [categories, activeCategory]);
+
+  // Close colour picker popover on outside click
+  useEffect(() => {
+    if (!catColourPopover) return;
+    function onDown(e) {
+      if (!catColourPopoverRef.current?.contains(e.target)) setCatColourPopover(null);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [catColourPopover]);
 
   // ── Expansion handlers ──
   function openAdd() {
@@ -519,10 +560,26 @@ export default function TextExpansions({
     e.preventDefault();
     const name = newCategoryName.trim();
     if (name) {
-      onAddCategory(name);
+      onAddCategory(name, newCategoryColour);
       setNewCategoryName('');
+      setNewCategoryColour(null);
     }
     setAddingCategory(false);
+  }
+
+  function openCatColourPopover(e, forCat) {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCatColourPopover({ forCat, x: rect.left, y: rect.bottom + 4 });
+  }
+
+  function handleCatColourSelect(colour) {
+    if (catColourPopover?.forCat === '__new__') {
+      setNewCategoryColour(colour);
+    } else if (catColourPopover?.forCat) {
+      onUpdateCategoryColour?.(catColourPopover.forCat, colour);
+    }
+    setCatColourPopover(null);
   }
 
   function handleDeleteCategoryConfirm(e, name) {
@@ -556,8 +613,8 @@ export default function TextExpansions({
       return;
     }
     const newCats = [...categories];
-    const fromIdx = newCats.indexOf(dragCat);
-    let toIdx = newCats.indexOf(cat);
+    const fromIdx = newCats.findIndex(c => c.name === dragCat);
+    let toIdx = newCats.findIndex(c => c.name === cat);
     if (dragOverSide === 'after') toIdx += 1;
     // Account for the gap left when the dragged item is removed
     const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx;
@@ -629,9 +686,9 @@ export default function TextExpansions({
       uncat.forEach(exp => result.push({ type: 'item', exp }));
     }
     for (const cat of categories) {
-      const items = sortItems(expansions.filter(e => e.category === cat));
+      const items = sortItems(expansions.filter(e => e.category === cat.name));
       if (items.length === 0) continue;
-      result.push({ type: 'header', label: cat, color: categoryColor(cat), count: items.length });
+      result.push({ type: 'header', label: cat.name, color: cat.colour || null, count: items.length });
       items.forEach(exp => result.push({ type: 'item', exp }));
     }
     return result;
@@ -767,37 +824,42 @@ export default function TextExpansions({
             </button>
 
             {categories.map(cat => {
-              const color = categoryColor(cat);
-              const isPending = pendingDeleteCat === cat;
-              const count = expansions.filter(e => e.category === cat).length;
-              const isDragging  = dragCat === cat;
-              const isDropTarget = dragOverCat === cat;
-              const dropClass = isDropTarget
+              const catColour   = cat.colour || null;
+              const isPending   = pendingDeleteCat === cat.name;
+              const count       = expansions.filter(e => e.category === cat.name).length;
+              const isDragging  = dragCat === cat.name;
+              const isDropTarget = dragOverCat === cat.name;
+              const dropClass   = isDropTarget
                 ? (dragOverSide === 'before' ? ' te-cat-drop-before' : ' te-cat-drop-after')
                 : '';
               return (
                 <div
-                  key={cat}
+                  key={cat.name}
                   className={`te-cat-tab-group${isDragging ? ' te-cat-dragging' : ''}${dropClass}`}
                   draggable
-                  onDragStart={e => handleCatDragStart(e, cat)}
-                  onDragOver={e => handleCatDragOver(e, cat)}
-                  onDrop={e => handleCatDrop(e, cat)}
+                  onDragStart={e => handleCatDragStart(e, cat.name)}
+                  onDragOver={e => handleCatDragOver(e, cat.name)}
+                  onDrop={e => handleCatDrop(e, cat.name)}
                   onDragEnd={handleCatDragEnd}
                 >
                   <button
-                    className={`te-cat-tab${activeCategory === cat ? ' te-cat-tab-active' : ''}`}
-                    style={{ '--cat-color': color }}
-                    onClick={() => { setActiveCategory(cat); setPendingDeleteCat(null); }}
+                    className={`te-cat-tab${activeCategory === cat.name ? ' te-cat-tab-active' : ''}`}
+                    style={catColour ? { '--cat-color': catColour } : {}}
+                    onClick={() => { setActiveCategory(cat.name); setPendingDeleteCat(null); }}
                   >
-                    <span className="te-cat-dot" style={{ background: color }} />
-                    {cat}
+                    <span
+                      className="te-cat-dot te-cat-dot-pick"
+                      style={catColour ? { background: catColour } : {}}
+                      onClick={e => openCatColourPopover(e, cat.name)}
+                      title="Change colour"
+                    />
+                    {cat.name}
                     <span className="te-cat-count">{count}</span>
                   </button>
                   <button
                     className={`te-cat-x${isPending ? ' te-cat-x-confirm' : ''}`}
-                    onMouseDown={e => handleDeleteCategoryConfirm(e, cat)}
-                    title={isPending ? 'Click to confirm delete' : `Delete "${cat}" category`}
+                    onMouseDown={e => handleDeleteCategoryConfirm(e, cat.name)}
+                    title={isPending ? 'Click to confirm delete' : `Delete "${cat.name}" category`}
                   >
                     {isPending ? 'Delete?' : '✕'}
                   </button>
@@ -834,6 +896,13 @@ export default function TextExpansions({
 
             {addingCategory ? (
               <form onSubmit={handleAddCategory} className="te-cat-add-form">
+                <span
+                  className="te-cat-add-colour-dot"
+                  style={newCategoryColour ? { background: newCategoryColour } : {}}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={e => openCatColourPopover(e, '__new__')}
+                  title="Pick a colour (optional)"
+                />
                 <input
                   autoFocus
                   className="te-cat-add-input"
@@ -845,7 +914,7 @@ export default function TextExpansions({
                 />
               </form>
             ) : (
-              <button className="te-cat-new-btn" onClick={() => setAddingCategory(true)}>
+              <button className="te-cat-new-btn" onClick={() => { setAddingCategory(true); setNewCategoryColour(null); }}>
                 + Category
               </button>
             )}
@@ -880,7 +949,8 @@ export default function TextExpansions({
                     );
                   }
                   const { exp } = item;
-                  const color = exp.category ? categoryColor(exp.category) : null;
+                  const catObj = exp.category ? categories.find(c => c.name === exp.category) : null;
+                  const color  = catObj?.colour || null;
                   const isEditingThis = editing && !editing.isNew && editing.originalTrigger === exp.trigger;
                   return (
                     <div
@@ -1005,7 +1075,7 @@ export default function TextExpansions({
                       >
                         <option value="">Uncategorised</option>
                         {categories.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
+                          <option key={cat.name} value={cat.name}>{cat.name}</option>
                         ))}
                       </select>
                     </div>
@@ -1222,6 +1292,25 @@ export default function TextExpansions({
             </div>
           )}
         </div>
+      )}
+
+      {/* Category colour picker popover */}
+      {catColourPopover && ReactDOM.createPortal(
+        <div
+          ref={catColourPopoverRef}
+          className="cat-colour-popover"
+          style={{ left: catColourPopover.x, top: catColourPopover.y }}
+        >
+          <ColourPicker
+            value={
+              catColourPopover.forCat === '__new__'
+                ? newCategoryColour
+                : categories.find(c => c.name === catColourPopover.forCat)?.colour || null
+            }
+            onChange={handleCatColourSelect}
+          />
+        </div>,
+        document.body
       )}
 
       {/* Delete confirmation dialog */}

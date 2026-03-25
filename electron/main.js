@@ -2769,9 +2769,32 @@ function initAutoUpdater() {
   console.log('[Updater] Feed config:', JSON.stringify(autoUpdater.getFeedURL?.() ?? '(using package.json publish config)'));
 
   autoUpdater.logger = console;
-  autoUpdater.autoDownload = false;        // never download without explicit user action
-  autoUpdater.autoInstallOnAppQuit = true; // apply cached update when app quits normally
-  autoUpdater.allowDowngrade = false;      // never roll back to an older version
+  autoUpdater.autoDownload = false;              // never download without explicit user action
+  autoUpdater.autoInstallOnAppQuit = true;       // apply cached update when app quits normally
+  autoUpdater.allowDowngrade = false;            // never roll back to an older version
+  autoUpdater.disableDifferentialDownload = true; // skip blockmap diff — avoids stall when old blockmap is unavailable locally
+  autoUpdater.disableWebInstaller = true;        // use the full NSIS installer, not the web stub
+
+  // Force the download cache to use "trigr-updater" regardless of the package.json "name" field.
+  // electron-updater derives the cache dir from app.getName() which returns the "name" field
+  // ("keyforge"), not "productName" ("Trigr"). Setting it explicitly here ensures the cached
+  // installer and the nuclear fallback path in install-update both agree on the directory name.
+  try {
+    const os   = require('os');
+    const path = require('path');
+    autoUpdater.app = autoUpdater.app ?? {};
+    const cacheDir = path.join(os.tmpdir(), 'trigr-updater');
+    // electron-updater exposes downloadedUpdateHelper once a download has run;
+    // the cache root is set via the internal _downloadedUpdateHelper or by
+    // overriding the cachePath getter on the updater instance.
+    Object.defineProperty(autoUpdater, 'cachePath', {
+      get: () => cacheDir,
+      configurable: true,
+    });
+    console.log('[Updater] Cache directory forced to:', cacheDir);
+  } catch (e) {
+    console.warn('[Updater] Could not override cachePath — cache dir may still be keyforge-updater:', e?.message ?? e);
+  }
 
   autoUpdater.on('checking-for-update', () => {
     console.log('[Updater] Checking for update...');
@@ -2812,7 +2835,7 @@ function initAutoUpdater() {
     try {
       const os = require('os');
       const path = require('path');
-      const cachePath = path.join(os.tmpdir(), `${app.getName()}-updater`);
+      const cachePath = path.join(os.tmpdir(), 'trigr-updater');
       console.log('[Updater] Expected cache directory:', cachePath);
       console.log('[Updater] autoInstallOnAppQuit:', autoUpdater.autoInstallOnAppQuit);
     } catch (e) { /* non-fatal */ }
@@ -2863,7 +2886,7 @@ ipcMain.handle('install-update', async () => {
     const os = require('os');
     const path = require('path');
     const fs = require('fs');
-    const cachePath = path.join(os.tmpdir(), `${app.getName()}-updater`);
+    const cachePath = path.join(os.tmpdir(), 'trigr-updater');
     console.log('[Updater] Cache directory:', cachePath);
     if (fs.existsSync(cachePath)) {
       const files = fs.readdirSync(cachePath);
@@ -2890,7 +2913,7 @@ ipcMain.handle('install-update', async () => {
       const os = require('os');
       const path = require('path');
       const fs = require('fs');
-      const cachePath = path.join(os.tmpdir(), `${app.getName()}-updater`);
+      const cachePath = path.join(os.tmpdir(), 'trigr-updater');
       console.log('[Updater] Looking for installer in:', cachePath);
 
       let installerPath = null;

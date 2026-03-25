@@ -83,7 +83,9 @@ function App() {
         const savedTheme = config.theme || 'dark';
         setTheme(savedTheme);
         document.documentElement.setAttribute('data-theme', savedTheme);
-        setExpansionCategories(config.expansionCategories || []);
+        // Migrate old string[] format to object[] format — treat missing colour as null
+        const rawCats = config.expansionCategories || [];
+        setExpansionCategories(rawCats.map(c => typeof c === 'string' ? { name: c, colour: null } : c));
         setGlobalVariables(config.globalVariables || {});
         const savedAcEnabled = config.autocorrectEnabled ?? false;
         setAutocorrectEnabled(savedAcEnabled);
@@ -419,9 +421,9 @@ function App() {
   }, [assignments, profiles, activeProfile, saveConfig, showNotification]);
 
   // ── Expansion categories ──────────────────────────────────
-  const handleAddCategory = useCallback((name) => {
-    if (!name || expansionCategories.includes(name)) return;
-    const newCategories = [...expansionCategories, name];
+  const handleAddCategory = useCallback((name, colour = null) => {
+    if (!name || expansionCategories.some(c => c.name === name)) return;
+    const newCategories = [...expansionCategories, { name, colour: colour || null }];
     setExpansionCategories(newCategories);
     window.electronAPI?.saveConfig({ assignments, profiles, activeProfile, profileSettings, theme, expansionCategories: newCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
   }, [expansionCategories, assignments, profiles, activeProfile, profileSettings, theme, autocorrectEnabled, macrosEnabledOnStartup]);
@@ -431,8 +433,14 @@ function App() {
     window.electronAPI?.saveConfig({ assignments, profiles, activeProfile, profileSettings, theme, expansionCategories: newCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
   }, [assignments, profiles, activeProfile, profileSettings, theme, autocorrectEnabled, macrosEnabledOnStartup]);
 
+  const handleUpdateCategoryColour = useCallback((name, colour) => {
+    const newCategories = expansionCategories.map(c => c.name === name ? { ...c, colour: colour || null } : c);
+    setExpansionCategories(newCategories);
+    window.electronAPI?.saveConfig({ assignments, profiles, activeProfile, profileSettings, theme, expansionCategories: newCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
+  }, [expansionCategories, assignments, profiles, activeProfile, profileSettings, theme, autocorrectEnabled, macrosEnabledOnStartup]);
+
   const handleDeleteCategory = useCallback((name) => {
-    const newCategories = expansionCategories.filter(c => c !== name);
+    const newCategories = expansionCategories.filter(c => c.name !== name);
     // Move all expansions in this category to uncategorised
     const newAssignments = { ...assignments };
     for (const [k, v] of Object.entries(newAssignments)) {
@@ -1079,6 +1087,7 @@ function App() {
               onAddCategory={handleAddCategory}
               onDeleteCategory={handleDeleteCategory}
               onReorderCategories={handleReorderCategories}
+              onUpdateCategoryColour={handleUpdateCategoryColour}
               autocorrectEnabled={autocorrectEnabled}
               onToggleAutocorrect={handleToggleAutocorrect}
               autocorrections={autocorrections}

@@ -207,7 +207,18 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
+  background: var(--text-muted);  /* neutral default when no colour set */
   flex-shrink: 0;
+}
+
+/* Make the dot a click target for colour picking */
+.te-cat-dot.te-cat-dot-pick {
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.te-cat-dot.te-cat-dot-pick:hover {
+  transform: scale(1.4);
+  box-shadow: 0 0 0 2px var(--bg-elevated);
 }
 
 .te-cat-count {
@@ -294,7 +305,26 @@
 }
 
 .te-cat-add-form {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   flex-shrink: 0;
+}
+
+/* Small colour dot in the new-category form */
+.te-cat-add-colour-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  border: 1.5px solid var(--border);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.te-cat-add-colour-dot:hover {
+  transform: scale(1.25);
+  border-color: var(--accent);
 }
 
 .te-cat-add-input {
@@ -620,9 +650,11 @@
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* neutral fallback for categories with no colour set */
+  --cat-color: var(--text-muted);
   background: color-mix(in srgb, var(--cat-color) 15%, transparent);
   color: var(--cat-color);
-  border: 1px solid color-mix(in srgb, var(--cat-color) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cat-color) 30%, transparent);
 }
 
 .te-item-arrow {
@@ -1718,4 +1750,65 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── Category colour picker ─────────────────────────────────────────────── */
+
+.cat-colour-popover {
+  position: fixed;
+  z-index: 9000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+}
+
+.cat-colour-picker {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  width: max-content;
+}
+
+.cat-colour-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  background: var(--swatch-color, var(--bg-active));
+  outline: none;
+  transition: transform 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+/* "None" swatch — first item, no --swatch-color set */
+.cat-colour-swatch:first-child {
+  background: var(--bg-active);
+  border-color: var(--border);
+  position: relative;
+}
+.cat-colour-swatch:first-child::after {
+  content: '×';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.cat-colour-swatch:hover {
+  transform: scale(1.2);
+  border-color: var(--text-secondary);
+}
+
+.cat-colour-swatch.selected {
+  border-color: var(--text-primary);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 1px var(--bg-elevated);
 }
