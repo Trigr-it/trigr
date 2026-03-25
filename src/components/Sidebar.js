@@ -136,7 +136,10 @@ export default function Sidebar({
             className={`sidebar-tab${tab === 'BARE' ? ' bare-tab' : ''}${activeTab === tab ? ' sidebar-tab-active' : ''}`}
             onClick={() => {
               setActiveTab(tab);
-              if (tab !== 'All') onSelectCombo?.(tab);
+              // Note: modifier state is intentionally NOT changed here.
+              // The modifier bar on the keyboard is the only way to change
+              // which layer is active — sidebar tabs are a display filter only.
+              onSelectCombo?.(tab);
             }}
             type="button"
           >

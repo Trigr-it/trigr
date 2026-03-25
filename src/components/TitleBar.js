@@ -204,7 +204,7 @@ export default function TitleBar({
 
         <div className="titlebar-divider" />
 
-        {/* Area tabs — top-level navigation between Mapping and Text Expansions */}
+        {/* Area tabs — top-level navigation between Mapping and Text Expansion */}
         <div className="area-tabs" data-drag="false">
           <button
             className={`area-tab${activeArea === 'mapping' ? ' active' : ''}`}
@@ -218,7 +218,7 @@ export default function TitleBar({
             onClick={() => onAreaChange?.('expansions')}
             type="button"
           >
-            Text Expansions
+            Text Expansion
           </button>
         </div>
 

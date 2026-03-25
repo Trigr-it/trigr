@@ -673,18 +673,20 @@ function App() {
   }, []);
 
   // ── Select assignment from sidebar ────────────────────────
+  // Modifier selection is intentionally NOT changed here — the modifier bar
+  // buttons are the only way to change which layer is active.  Clicking a
+  // sidebar item should only focus that key/view without disturbing the
+  // current modifier state.
   const handleSelectAssignment = useCallback((keyId, combo) => {
-    // Parse combo string e.g. "Ctrl+Alt" → ["Ctrl", "Alt"]
-    const mods = combo ? combo.split('+').filter(Boolean) : [];
-    setActiveModifiers(mods);
     setSelectedKey(keyId);
     // Switch view to match the selected key type
     setActiveView(keyId.startsWith('MOUSE_') ? 'mouse' : 'keyboard');
   }, []);
 
-  const handleSelectCombo = useCallback((comboStr) => {
-    const mods = comboStr ? comboStr.split('+').filter(Boolean) : [];
-    setActiveModifiers(mods);
+  // Sidebar combo-tab clicks update the sidebar's display filter only.
+  // Modifier state is left untouched so clicking a tab never clears the
+  // modifier layer the user selected via the keyboard modifier bar.
+  const handleSelectCombo = useCallback((_comboStr) => {
     setSelectedKey(null);
   }, []);
 
