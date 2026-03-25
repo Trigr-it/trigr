@@ -414,6 +414,7 @@ export default function TextExpansions({
   categories = [],
   onAddCategory,
   onDeleteCategory,
+  onReorderCategories,
   // Autocorrect props
   autocorrectEnabled,
   onToggleAutocorrect,
@@ -444,6 +445,16 @@ export default function TextExpansions({
   const [newCategoryName, setNewCategoryName] = useState('');
   const [pendingDeleteCat, setPendingDeleteCat] = useState(null);
   const [deleteConfirm, setDeleteConfirm]       = useState(null); // trigger string awaiting confirmation
+
+  // ── Category drag-and-drop state ──
+  const [dragCat,     setDragCat]     = useState(null);
+  const [dragOverCat, setDragOverCat] = useState(null);
+  const [dragOverSide, setDragOverSide] = useState(null); // 'before' | 'after'
+
+  // ── Expansion sort state (persisted to localStorage) ──
+  const [sortKey, setSortKey] = useState(() =>
+    localStorage.getItem('trigr.expansionSort') || 'default'
+  );
 
   // ── Autocorrect form state ──
   const [acEditing, setAcEditing]       = useState(null); // null | { isNew, originalTypo? }
@@ -524,6 +535,42 @@ export default function TextExpansions({
     }
   }
 
+  // ── Category drag-and-drop handlers ──
+  function handleCatDragStart(e, cat) {
+    e.dataTransfer.effectAllowed = 'move';
+    setDragCat(cat);
+  }
+
+  function handleCatDragOver(e, cat) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDragOverCat(cat);
+    setDragOverSide(e.clientX < rect.left + rect.width / 2 ? 'before' : 'after');
+  }
+
+  function handleCatDrop(e, cat) {
+    e.preventDefault();
+    if (!dragCat || dragCat === cat) {
+      setDragCat(null); setDragOverCat(null); setDragOverSide(null);
+      return;
+    }
+    const newCats = [...categories];
+    const fromIdx = newCats.indexOf(dragCat);
+    let toIdx = newCats.indexOf(cat);
+    if (dragOverSide === 'after') toIdx += 1;
+    // Account for the gap left when the dragged item is removed
+    const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx;
+    newCats.splice(fromIdx, 1);
+    newCats.splice(Math.max(0, insertAt), 0, dragCat);
+    onReorderCategories?.(newCats);
+    setDragCat(null); setDragOverCat(null); setDragOverSide(null);
+  }
+
+  function handleCatDragEnd() {
+    setDragCat(null); setDragOverCat(null); setDragOverSide(null);
+  }
+
   // ── Autocorrect handlers ──
   function openAcAdd() {
     setAcTypo('');
@@ -557,24 +604,32 @@ export default function TextExpansions({
 
   // Build flat list for the current expansion tab
   const listItems = (() => {
-    const byTrigger = arr => [...arr].sort((a, b) => a.trigger.localeCompare(b.trigger));
+    function sortItems(arr) {
+      const a = [...arr];
+      switch (sortKey) {
+        case 'trigger-desc': return a.sort((x, y) => y.trigger.localeCompare(x.trigger));
+        case 'name-asc':     return a.sort((x, y) => (x.displayName || x.trigger).localeCompare(y.displayName || y.trigger));
+        case 'name-desc':    return a.sort((x, y) => (y.displayName || y.trigger).localeCompare(x.displayName || x.trigger));
+        default:             return a.sort((x, y) => x.trigger.localeCompare(y.trigger)); // 'default' = trigger A→Z
+      }
+    }
 
     if (activeCategory !== 'All') {
       const pool = activeCategory === '__uncategorised__'
         ? expansions.filter(e => !e.category)
         : expansions.filter(e => e.category === activeCategory);
-      return byTrigger(pool).map(exp => ({ type: 'item', exp }));
+      return sortItems(pool).map(exp => ({ type: 'item', exp }));
     }
 
-    // All tab — grouped: uncategorised first, then named categories
+    // All tab — grouped: uncategorised first, then named categories in user-defined order
     const result = [];
-    const uncat = byTrigger(expansions.filter(e => !e.category));
+    const uncat = sortItems(expansions.filter(e => !e.category));
     if (uncat.length > 0) {
       result.push({ type: 'header', label: 'Uncategorised', color: null, count: uncat.length });
       uncat.forEach(exp => result.push({ type: 'item', exp }));
     }
     for (const cat of categories) {
-      const items = byTrigger(expansions.filter(e => e.category === cat));
+      const items = sortItems(expansions.filter(e => e.category === cat));
       if (items.length === 0) continue;
       result.push({ type: 'header', label: cat, color: categoryColor(cat), count: items.length });
       items.forEach(exp => result.push({ type: 'item', exp }));
@@ -715,8 +770,21 @@ export default function TextExpansions({
               const color = categoryColor(cat);
               const isPending = pendingDeleteCat === cat;
               const count = expansions.filter(e => e.category === cat).length;
+              const isDragging  = dragCat === cat;
+              const isDropTarget = dragOverCat === cat;
+              const dropClass = isDropTarget
+                ? (dragOverSide === 'before' ? ' te-cat-drop-before' : ' te-cat-drop-after')
+                : '';
               return (
-                <div key={cat} className="te-cat-tab-group">
+                <div
+                  key={cat}
+                  className={`te-cat-tab-group${isDragging ? ' te-cat-dragging' : ''}${dropClass}`}
+                  draggable
+                  onDragStart={e => handleCatDragStart(e, cat)}
+                  onDragOver={e => handleCatDragOver(e, cat)}
+                  onDrop={e => handleCatDrop(e, cat)}
+                  onDragEnd={handleCatDragEnd}
+                >
                   <button
                     className={`te-cat-tab${activeCategory === cat ? ' te-cat-tab-active' : ''}`}
                     style={{ '--cat-color': color }}
@@ -748,6 +816,21 @@ export default function TextExpansions({
             )}
 
             <div className="te-cat-bar-spacer" />
+
+            <select
+              className="te-sort-select"
+              value={sortKey}
+              onChange={e => {
+                setSortKey(e.target.value);
+                localStorage.setItem('trigr.expansionSort', e.target.value);
+              }}
+              title="Sort expansions"
+            >
+              <option value="default">Trigger A→Z</option>
+              <option value="trigger-desc">Trigger Z→A</option>
+              <option value="name-asc">Name A→Z</option>
+              <option value="name-desc">Name Z→A</option>
+            </select>
 
             {addingCategory ? (
               <form onSubmit={handleAddCategory} className="te-cat-add-form">

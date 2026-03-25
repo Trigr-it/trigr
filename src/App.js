@@ -426,6 +426,11 @@ function App() {
     window.electronAPI?.saveConfig({ assignments, profiles, activeProfile, profileSettings, theme, expansionCategories: newCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
   }, [expansionCategories, assignments, profiles, activeProfile, profileSettings, theme, autocorrectEnabled, macrosEnabledOnStartup]);
 
+  const handleReorderCategories = useCallback((newCategories) => {
+    setExpansionCategories(newCategories);
+    window.electronAPI?.saveConfig({ assignments, profiles, activeProfile, profileSettings, theme, expansionCategories: newCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
+  }, [assignments, profiles, activeProfile, profileSettings, theme, autocorrectEnabled, macrosEnabledOnStartup]);
+
   const handleDeleteCategory = useCallback((name) => {
     const newCategories = expansionCategories.filter(c => c !== name);
     // Move all expansions in this category to uncategorised
@@ -1063,6 +1068,7 @@ function App() {
               categories={expansionCategories}
               onAddCategory={handleAddCategory}
               onDeleteCategory={handleDeleteCategory}
+              onReorderCategories={handleReorderCategories}
               autocorrectEnabled={autocorrectEnabled}
               onToggleAutocorrect={handleToggleAutocorrect}
               autocorrections={autocorrections}

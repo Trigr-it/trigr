@@ -309,6 +309,62 @@
   width: 120px;
 }
 
+/* ── Category drag-and-drop ─────────────────────────────────────────────── */
+
+.te-cat-tab-group[draggable] {
+  cursor: grab;
+}
+
+.te-cat-tab-group[draggable]:active {
+  cursor: grabbing;
+}
+
+.te-cat-tab-group.te-cat-dragging {
+  opacity: 0.35;
+}
+
+/* Insertion line — shown on the side the item will be inserted */
+.te-cat-tab-group.te-cat-drop-before {
+  border-left: 2px solid var(--accent);
+  margin-left: -2px;
+}
+
+.te-cat-tab-group.te-cat-drop-after {
+  border-right: 2px solid var(--accent);
+  margin-right: -2px;
+}
+
+/* ── Sort select ────────────────────────────────────────────────────────── */
+
+.te-sort-select {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 20px 0 7px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+.te-sort-select:hover {
+  border-color: var(--border-accent);
+  color: var(--text-secondary);
+}
+
+.te-sort-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
 /* ── Body: list + edit panel ────────────────────────────────────────────── */
 
 .te-body {
