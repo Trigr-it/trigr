@@ -915,7 +915,15 @@ function App() {
                 <span className="update-banner__text">Trigr {updateInfo.version} is ready to install</span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"
-                  onClick={() => window.electronAPI?.installUpdate()}
+                  onClick={async () => {
+                    console.log('[UpdateBanner] Restart Now clicked — calling installUpdate()');
+                    try {
+                      const result = await window.electronAPI?.installUpdate();
+                      console.log('[UpdateBanner] installUpdate() response:', JSON.stringify(result));
+                    } catch (err) {
+                      console.error('[UpdateBanner] installUpdate() threw:', err?.message ?? err);
+                    }
+                  }}
                   type="button"
                 >Restart Now</button>
                 <button

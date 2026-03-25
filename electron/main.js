@@ -2853,8 +2853,71 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
-ipcMain.on('install-update', () => {
-  autoUpdater.quitAndInstall(false, true);
+ipcMain.handle('install-update', async () => {
+  console.log('[Updater] install-update IPC handler called');
+  console.log('[Updater] currentVersion:', autoUpdater.currentVersion);
+  console.log('[Updater] autoInstallOnAppQuit:', autoUpdater.autoInstallOnAppQuit);
+
+  // Check if there is a cached update on disk
+  try {
+    const os = require('os');
+    const path = require('path');
+    const fs = require('fs');
+    const cachePath = path.join(os.tmpdir(), `${app.getName()}-updater`);
+    console.log('[Updater] Cache directory:', cachePath);
+    if (fs.existsSync(cachePath)) {
+      const files = fs.readdirSync(cachePath);
+      console.log('[Updater] Cache contents:', files);
+    } else {
+      console.warn('[Updater] Cache directory does not exist — update may not have been downloaded');
+    }
+  } catch (e) {
+    console.error('[Updater] Error checking cache dir:', e?.message ?? e);
+  }
+
+  try {
+    console.log('[Updater] Calling autoUpdater.quitAndInstall(false, true)...');
+    autoUpdater.quitAndInstall(false, true);
+    console.log('[Updater] quitAndInstall() returned (app should be quitting)');
+    return { success: true };
+  } catch (err) {
+    console.error('[Updater] quitAndInstall() threw:', err?.message ?? err);
+    console.error('[Updater] Full error:', err);
+
+    // Nuclear fallback: find the installer in the cache and run it directly
+    try {
+      console.log('[Updater] Attempting nuclear fallback: launching installer directly...');
+      const os = require('os');
+      const path = require('path');
+      const fs = require('fs');
+      const cachePath = path.join(os.tmpdir(), `${app.getName()}-updater`);
+      console.log('[Updater] Looking for installer in:', cachePath);
+
+      let installerPath = null;
+      if (fs.existsSync(cachePath)) {
+        const files = fs.readdirSync(cachePath);
+        console.log('[Updater] Cache files:', files);
+        const installer = files.find(f => f.endsWith('.exe') || f.endsWith('.msi'));
+        if (installer) {
+          installerPath = path.join(cachePath, installer);
+        }
+      }
+
+      if (installerPath && fs.existsSync(installerPath)) {
+        console.log('[Updater] Launching installer:', installerPath);
+        await shell.openPath(installerPath);
+        console.log('[Updater] Installer launched — quitting app');
+        app.quit();
+        return { success: true, fallback: true };
+      } else {
+        console.error('[Updater] No installer found in cache for nuclear fallback');
+        return { success: false, error: err?.message ?? String(err), fallback: false };
+      }
+    } catch (fallbackErr) {
+      console.error('[Updater] Nuclear fallback also failed:', fallbackErr?.message ?? fallbackErr);
+      return { success: false, error: err?.message ?? String(err), fallbackError: fallbackErr?.message ?? String(fallbackErr) };
+    }
+  }
 });
 
 ipcMain.on('start-download', () => {
