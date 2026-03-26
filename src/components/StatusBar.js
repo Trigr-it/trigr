@@ -1,7 +1,7 @@
 import React from 'react';
 import './StatusBar.css';
 
-export default function StatusBar({ selectedKey, currentCombo, macrosEnabled, assignmentCount, notification, engineStatus, lastFired }) {
+export default function StatusBar({ selectedKey, currentCombo, macrosEnabled, assignmentCount, notification, engineStatus, lastFired, appVersion }) {
   const { uiohookAvailable, nutjsAvailable } = engineStatus || {};
 
   return (
@@ -52,7 +52,7 @@ export default function StatusBar({ selectedKey, currentCombo, macrosEnabled, as
           {nutjsAvailable ? '⬤' : '○'} Executor
         </span>
         <span className="status-sep">·</span>
-        <span className="status-info">Trigr v1.0</span>
+        <span className="status-info">Trigr {appVersion ? `v${appVersion}` : 'v…'}</span>
       </div>
 
       {notification && (

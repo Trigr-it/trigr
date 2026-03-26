@@ -477,7 +477,8 @@ export default function TextExpansions({
   const catColourPopoverRef = useRef(null);
   // ── Category context menu ──
   const [catContextMenu, setCatContextMenu] = useState(null); // { catName, x, y }
-  const catContextMenuRef = useRef(null);
+  const catContextMenuRef  = useRef(null);
+  const catContextTabRef   = useRef(null); // DOM element of the right-clicked tab (for colour picker anchor)
   // ── Category inline rename ──
   const [renamingCat, setRenamingCat]   = useState(null);
   const [renameValue, setRenameValue]   = useState('');
@@ -617,9 +618,10 @@ export default function TextExpansions({
   // ── Category context menu handlers ──
   function handleCatContextMenu(e, catName) {
     e.preventDefault();
-    // Store the tab's bounding rect so Change Colour can anchor to the tab, not the mouse position
-    const tabRect = e.currentTarget.getBoundingClientRect();
-    setCatContextMenu({ catName, x: e.clientX, y: e.clientY, tabRect });
+    // Store the tab DOM element in a ref — DOMRect values are read fresh when needed,
+    // avoiding issues with storing non-plain DOMRect objects in React state.
+    catContextTabRef.current = e.currentTarget;
+    setCatContextMenu({ catName, x: e.clientX, y: e.clientY });
   }
 
   function ctxRename() {
@@ -631,11 +633,17 @@ export default function TextExpansions({
   }
 
   function ctxChangeColour() {
-    const { catName, tabRect } = catContextMenu;
-    // Anchor below the tab's left edge; clamp right so it stays within the viewport
-    const PICKER_WIDTH = 212;
-    const left = Math.min(tabRect.left, window.innerWidth - PICKER_WIDTH - 8);
-    setCatColourPopover({ forCat: catName, x: left, y: tabRect.bottom + 4 });
+    const { catName } = catContextMenu;
+    // Read the tab's position fresh at click time — anchors picker below the tab
+    const tabRect = catContextTabRef.current?.getBoundingClientRect();
+    if (tabRect) {
+      const PICKER_WIDTH = 212;
+      const left = Math.min(tabRect.left, window.innerWidth - PICKER_WIDTH - 8);
+      setCatColourPopover({ forCat: catName, x: left, y: tabRect.bottom + 4 });
+    } else {
+      // Fallback: open below the context menu if tab ref is unexpectedly gone
+      setCatColourPopover({ forCat: catName, x: catContextMenu.x, y: catContextMenu.y + 4 });
+    }
     setCatContextMenu(null);
   }
 

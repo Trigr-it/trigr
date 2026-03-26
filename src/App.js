@@ -48,6 +48,7 @@ function App() {
   const [overlayIncludeAutocorrect,  setOverlayIncludeAutocorrect]  = useState(false);
   const [doubleTapWindow,            setDoubleTapWindow]            = useState(300);
   const [updateInfo,     setUpdateInfo]     = useState(null);   // { version, percent, ready, dismissed }
+  const [appVersion,     setAppVersion]     = useState('');
 
 
   // Current modifier combo string e.g. "Ctrl+Alt"
@@ -57,6 +58,7 @@ function App() {
   useEffect(() => {
     const init = async () => {
       if (!window.electronAPI) return;
+      window.electronAPI.getAppVersion().then(v => { if (v) setAppVersion(v); });
       const config = await window.electronAPI.loadConfig();
       if (config) {
         // Migrate any pre-global expansion keys (Profile::EXPANSION::trigger →
@@ -943,11 +945,11 @@ function App() {
           <div className="update-banner">
             {updateInfo.phase === 'ready' ? (
               <>
-                <span className="update-banner__text">Trigr {updateInfo.version} is ready to install</span>
+                <span className="update-banner__text">Trigr {updateInfo.version} ready — Trigr will close to install. Reopen manually when complete.</span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"
                   onClick={async () => {
-                    console.log('[UpdateBanner] Restart Now clicked — calling installUpdate()');
+                    console.log('[UpdateBanner] Update Now clicked — calling installUpdate()');
                     try {
                       const result = await window.electronAPI?.installUpdate();
                       console.log('[UpdateBanner] installUpdate() response:', JSON.stringify(result));
@@ -956,7 +958,7 @@ function App() {
                     }
                   }}
                   type="button"
-                >Restart Now</button>
+                >Update Now</button>
                 <button
                   className="update-banner__btn update-banner__btn--later"
                   onClick={() => setUpdateInfo(prev => ({ ...prev, phase: 'dismissed' }))}
@@ -1171,6 +1173,7 @@ function App() {
         notification={notification}
         engineStatus={engineStatus}
         lastFired={lastFired}
+        appVersion={appVersion}
       />
     </div>
   );
