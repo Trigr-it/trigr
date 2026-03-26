@@ -853,8 +853,10 @@ function App() {
       if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
     };
 
-    window.electronAPI.onUpdateAvailable(({ version, downloadSize }) => {
-      setUpdateInfo({ version, downloadSize: downloadSize || null, percent: 0, bytesPerSecond: 0, total: 0, phase: 'available' });
+    window.electronAPI.onUpdateAvailable(({ version }) => {
+      // Do NOT store downloadSize from the manifest — that's the full installer size (~114 MB),
+      // not the differential download size. Real size comes from progress.total once download starts.
+      setUpdateInfo({ version, percent: 0, bytesPerSecond: 0, total: 0, phase: 'available' });
     });
 
     window.electronAPI.onDownloadProgress(({ percent, transferred, total, bytesPerSecond }) => {
@@ -930,9 +932,9 @@ function App() {
         </div>
       )}
       {updateInfo && updateInfo.phase !== 'dismissed' && (() => {
-        const sizeLabel    = fmtBytes(updateInfo.downloadSize);
-        const actualLabel  = fmtBytes(updateInfo.total);          // real differential size once known
-        const displaySize  = actualLabel || sizeLabel;
+        // Only show size once download-progress fires and progress.total is known — that is the
+        // real (possibly differential) download size, not the full installer size from the manifest.
+        const displaySize = fmtBytes(updateInfo.total);
         const eta          = fmtEta(
           (updateInfo.total || 0) - (updateInfo.transferred || 0),
           updateInfo.bytesPerSecond
@@ -980,7 +982,6 @@ function App() {
               <>
                 <span className="update-banner__text">
                   Trigr {updateInfo.version} available
-                  {displaySize ? ` — ${displaySize}` : ''}
                 </span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"

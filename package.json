@@ -46,10 +46,44 @@
     "directories": {
       "output": "dist"
     },
+    "electronLanguages": ["en-US"],
     "files": [
       "build/**/*",
       "electron/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+
+      "!node_modules/koffi/build/koffi/darwin_arm64/**",
+      "!node_modules/koffi/build/koffi/darwin_x64/**",
+      "!node_modules/koffi/build/koffi/freebsd_arm64/**",
+      "!node_modules/koffi/build/koffi/freebsd_ia32/**",
+      "!node_modules/koffi/build/koffi/freebsd_x64/**",
+      "!node_modules/koffi/build/koffi/linux_arm64/**",
+      "!node_modules/koffi/build/koffi/linux_armhf/**",
+      "!node_modules/koffi/build/koffi/linux_ia32/**",
+      "!node_modules/koffi/build/koffi/linux_loong64/**",
+      "!node_modules/koffi/build/koffi/linux_riscv64d/**",
+      "!node_modules/koffi/build/koffi/linux_x64/**",
+      "!node_modules/koffi/build/koffi/musl_arm64/**",
+      "!node_modules/koffi/build/koffi/musl_x64/**",
+      "!node_modules/koffi/build/koffi/openbsd_ia32/**",
+      "!node_modules/koffi/build/koffi/openbsd_x64/**",
+      "!node_modules/koffi/build/koffi/win32_arm64/**",
+      "!node_modules/koffi/build/koffi/win32_ia32/**",
+
+      "!node_modules/koffi/src/**",
+      "!node_modules/koffi/doc/**",
+      "!node_modules/koffi/vendor/**",
+
+      "!node_modules/@nut-tree-fork/libnut-darwin/**",
+      "!node_modules/@nut-tree-fork/libnut-linux/**",
+
+      "!**/*.map",
+      "!**/*.md",
+      "!**/test{s,}/**",
+      "!**/docs/**",
+      "!**/.github/**",
+      "!**/examples/**",
+      "!**/benchmark{s,}/**"
     ],
     "extraResources": [
       {

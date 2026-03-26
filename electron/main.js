@@ -2941,13 +2941,21 @@ ipcMain.handle('install-update', async () => {
   }
 
   try {
-    console.log('[Updater] Launching installer via shell.openPath:', installerPath);
-    await shell.openPath(installerPath);
-    console.log('[Updater] Installer launched — quitting app');
+    const { spawn } = require('child_process');
+    console.log('[Updater] Spawning installer silently:', installerPath, ['/SILENT', '--updated']);
+    // /SILENT   — NSIS installs without showing any UI
+    // --updated — marker arg so the relaunched app can detect it came from an auto-update
+    // detached + stdio:ignore + unref() — installer runs fully independently;
+    //   app.quit() can return immediately without waiting for it
+    spawn(installerPath, ['/SILENT', '--updated'], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+    console.log('[Updater] Installer spawned — quitting app');
     app.quit();
     return { success: true };
   } catch (err) {
-    console.error('[Updater] Failed to launch installer:', err?.message ?? err);
+    console.error('[Updater] Failed to spawn installer:', err?.message ?? err);
     return { success: false, error: err?.message ?? String(err) };
   }
 });
