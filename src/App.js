@@ -439,6 +439,25 @@ function App() {
     window.electronAPI?.saveConfig({ assignments, profiles, activeProfile, profileSettings, theme, expansionCategories: newCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
   }, [expansionCategories, assignments, profiles, activeProfile, profileSettings, theme, autocorrectEnabled, macrosEnabledOnStartup]);
 
+  const handleRenameCategory = useCallback((oldName, newName) => {
+    if (!newName || newName === oldName) return;
+    if (expansionCategories.some(c => c.name === newName)) return; // duplicate guard
+    const newCategories = expansionCategories.map(c =>
+      c.name === oldName ? { ...c, name: newName } : c
+    );
+    // Rewrite every expansion that belongs to this category
+    const newAssignments = { ...assignments };
+    for (const [k, v] of Object.entries(newAssignments)) {
+      if (k.startsWith('GLOBAL::EXPANSION::') && v.data?.category === oldName) {
+        newAssignments[k] = { ...v, data: { ...v.data, category: newName } };
+      }
+    }
+    setExpansionCategories(newCategories);
+    setAssignments(newAssignments);
+    syncEngine(newAssignments, activeProfile);
+    window.electronAPI?.saveConfig({ assignments: newAssignments, profiles, activeProfile, profileSettings, theme, expansionCategories: newCategories, autocorrectEnabled, macrosEnabledOnStartup, hasSeenWelcome: true });
+  }, [expansionCategories, assignments, profiles, activeProfile, profileSettings, theme, syncEngine, autocorrectEnabled, macrosEnabledOnStartup]);
+
   const handleDeleteCategory = useCallback((name) => {
     const newCategories = expansionCategories.filter(c => c.name !== name);
     // Move all expansions in this category to uncategorised
@@ -1088,6 +1107,7 @@ function App() {
               onDeleteCategory={handleDeleteCategory}
               onReorderCategories={handleReorderCategories}
               onUpdateCategoryColour={handleUpdateCategoryColour}
+              onRenameCategory={handleRenameCategory}
               autocorrectEnabled={autocorrectEnabled}
               onToggleAutocorrect={handleToggleAutocorrect}
               autocorrections={autocorrections}

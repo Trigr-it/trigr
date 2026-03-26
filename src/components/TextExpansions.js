@@ -441,6 +441,7 @@ export default function TextExpansions({
   onDeleteCategory,
   onReorderCategories,
   onUpdateCategoryColour,
+  onRenameCategory,
   // Autocorrect props
   autocorrectEnabled,
   onToggleAutocorrect,
@@ -474,6 +475,15 @@ export default function TextExpansions({
   // ── Category colour picker popover ──
   const [catColourPopover, setCatColourPopover] = useState(null); // { forCat, x, y }
   const catColourPopoverRef = useRef(null);
+  // ── Category context menu ──
+  const [catContextMenu, setCatContextMenu] = useState(null); // { catName, x, y }
+  const catContextMenuRef = useRef(null);
+  // ── Category inline rename ──
+  const [renamingCat, setRenamingCat]   = useState(null);
+  const [renameValue, setRenameValue]   = useState('');
+  const [renameError, setRenameError]   = useState('');
+  const renameInputRef                  = useRef(null);
+  const renameCommitting                = useRef(false);
   const [deleteConfirm, setDeleteConfirm]       = useState(null); // trigger string awaiting confirmation
 
   // ── Category drag-and-drop state ──
@@ -522,6 +532,28 @@ export default function TextExpansions({
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [catColourPopover]);
+
+  // Close category context menu on outside click or Escape
+  useEffect(() => {
+    if (!catContextMenu) return;
+    function onDown(e) {
+      if (catContextMenuRef.current && !catContextMenuRef.current.contains(e.target)) {
+        setCatContextMenu(null);
+      }
+    }
+    function onKey(e) { if (e.key === 'Escape') setCatContextMenu(null); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [catContextMenu]);
+
+  // Auto-select all text when inline rename input appears
+  useEffect(() => {
+    if (renamingCat) renameInputRef.current?.select();
+  }, [renamingCat]);
 
   // ── Expansion handlers ──
   function openAdd() {
@@ -580,6 +612,60 @@ export default function TextExpansions({
       onUpdateCategoryColour?.(catColourPopover.forCat, colour);
     }
     setCatColourPopover(null);
+  }
+
+  // ── Category context menu handlers ──
+  function handleCatContextMenu(e, catName) {
+    e.preventDefault();
+    // Store the tab's bounding rect so Change Colour can anchor to the tab, not the mouse position
+    const tabRect = e.currentTarget.getBoundingClientRect();
+    setCatContextMenu({ catName, x: e.clientX, y: e.clientY, tabRect });
+  }
+
+  function ctxRename() {
+    const name = catContextMenu.catName;
+    setCatContextMenu(null);
+    setRenamingCat(name);
+    setRenameValue(name);
+    setRenameError('');
+  }
+
+  function ctxChangeColour() {
+    const { catName, tabRect } = catContextMenu;
+    // Anchor below the tab's left edge; clamp right so it stays within the viewport
+    const PICKER_WIDTH = 212;
+    const left = Math.min(tabRect.left, window.innerWidth - PICKER_WIDTH - 8);
+    setCatColourPopover({ forCat: catName, x: left, y: tabRect.bottom + 4 });
+    setCatContextMenu(null);
+  }
+
+  function ctxDelete() {
+    onDeleteCategory(catContextMenu.catName);
+    setCatContextMenu(null);
+  }
+
+  // ── Inline rename handlers ──
+  function commitCatRename() {
+    const trimmed = renameValue.trim();
+    if (!trimmed) { setRenameError('Name cannot be empty'); return; }
+    if (trimmed !== renamingCat && normCategories.some(c => c.name === trimmed)) {
+      setRenameError('Already exists'); return;
+    }
+    renameCommitting.current = true;
+    if (trimmed !== renamingCat) {
+      onRenameCategory?.(renamingCat, trimmed);
+      if (activeCategory === renamingCat) setActiveCategory(trimmed);
+    }
+    setRenamingCat(null);
+    setRenameValue('');
+    setRenameError('');
+  }
+
+  function cancelCatRename() {
+    if (renameCommitting.current) { renameCommitting.current = false; return; }
+    setRenamingCat(null);
+    setRenameValue('');
+    setRenameError('');
   }
 
   function handleDeleteCategoryConfirm(e, name) {
@@ -842,26 +928,48 @@ export default function TextExpansions({
                 <div
                   key={cat.name}
                   className={`te-cat-tab-group${isDragging ? ' te-cat-dragging' : ''}${dropClass}`}
-                  draggable
-                  onDragStart={e => handleCatDragStart(e, cat.name)}
+                  draggable={renamingCat !== cat.name}
+                  onDragStart={renamingCat !== cat.name ? e => handleCatDragStart(e, cat.name) : undefined}
                   onDragOver={e => handleCatDragOver(e, cat.name)}
                   onDrop={e => handleCatDrop(e, cat.name)}
                   onDragEnd={handleCatDragEnd}
                 >
-                  <button
-                    className={`te-cat-tab${activeCategory === cat.name ? ' te-cat-tab-active' : ''}`}
-                    style={catColour ? { '--cat-color': catColour } : {}}
-                    onClick={() => { setActiveCategory(cat.name); setPendingDeleteCat(null); }}
-                  >
-                    <span
-                      className="te-cat-dot te-cat-dot-pick"
-                      style={catColour ? { background: catColour } : {}}
-                      onClick={e => openCatColourPopover(e, cat.name)}
-                      title="Change colour"
-                    />
-                    {cat.name}
-                    <span className="te-cat-count">{count}</span>
-                  </button>
+                  {renamingCat === cat.name ? (
+                    <div
+                      className={`te-cat-tab te-cat-tab-active te-cat-rename-wrap`}
+                      style={catColour ? { '--cat-color': catColour } : {}}
+                    >
+                      <input
+                        ref={renameInputRef}
+                        className="te-cat-rename-input"
+                        value={renameValue}
+                        onChange={e => { setRenameValue(e.target.value); setRenameError(''); }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter')  { e.preventDefault(); commitCatRename(); }
+                          if (e.key === 'Escape') { e.preventDefault(); cancelCatRename(); }
+                          e.stopPropagation();
+                        }}
+                        onBlur={cancelCatRename}
+                      />
+                      {renameError && <span className="te-cat-rename-error">{renameError}</span>}
+                    </div>
+                  ) : (
+                    <button
+                      className={`te-cat-tab${activeCategory === cat.name ? ' te-cat-tab-active' : ''}`}
+                      style={catColour ? { '--cat-color': catColour } : {}}
+                      onClick={() => { setActiveCategory(cat.name); setPendingDeleteCat(null); }}
+                      onContextMenu={e => handleCatContextMenu(e, cat.name)}
+                    >
+                      <span
+                        className="te-cat-dot te-cat-dot-pick"
+                        style={catColour ? { background: catColour } : {}}
+                        onClick={e => openCatColourPopover(e, cat.name)}
+                        title="Change colour"
+                      />
+                      {cat.name}
+                      <span className="te-cat-count">{count}</span>
+                    </button>
+                  )}
                   <button
                     className={`te-cat-x${isPending ? ' te-cat-x-confirm' : ''}`}
                     onMouseDown={e => handleDeleteCategoryConfirm(e, cat.name)}
@@ -1298,6 +1406,21 @@ export default function TextExpansions({
             </div>
           )}
         </div>
+      )}
+
+      {/* Category right-click context menu */}
+      {catContextMenu && ReactDOM.createPortal(
+        <div
+          ref={catContextMenuRef}
+          className="profile-context-menu"
+          style={{ top: catContextMenu.y, left: catContextMenu.x }}
+        >
+          <button className="pcm-item" onClick={ctxRename}>Rename</button>
+          <button className="pcm-item" onClick={ctxChangeColour}>Change Colour</button>
+          <div className="pcm-divider" />
+          <button className="pcm-item pcm-delete" onClick={ctxDelete}>Delete</button>
+        </div>,
+        document.body
       )}
 
       {/* Category colour picker popover */}

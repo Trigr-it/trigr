@@ -2774,6 +2774,9 @@ function initAutoUpdater() {
   autoUpdater.allowDowngrade = false;            // never roll back to an older version
   autoUpdater.disableDifferentialDownload = true; // skip blockmap diff — avoids stall when old blockmap is unavailable locally
   autoUpdater.disableWebInstaller = true;        // use the full NSIS installer, not the web stub
+  // Disable signature verification — build is not yet code-signed (Microsoft Trusted Signing pending).
+  // Remove this line once signing is configured and the certificate is trusted.
+  autoUpdater.verifyUpdateCodeSignature = () => Promise.resolve(undefined);
 
   autoUpdater.on('checking-for-update', () => {
     console.log('[Updater] Checking for update...');
@@ -2885,21 +2888,40 @@ ipcMain.handle('install-update', async () => {
     console.log('[Updater]   Contents:', baseFiles);
 
     // 1. Preferred: pending\ subdirectory — contains the verified temp installer
-    //    e.g. pending\temp-Trigr-Setup-0.1.8.exe
+    //    e.g. pending\temp-Trigr-Setup-0.1.9.exe
+    //    Sort candidates by semver descending and pick the newest.
     const pendingDir = path.join(base, 'pending');
     if (fs.existsSync(pendingDir)) {
       const pendingFiles = fs.readdirSync(pendingDir);
-      console.log('[Updater]   pending\ contents:', pendingFiles);
-      const pending = pendingFiles.find(
-        f => (f.startsWith('temp-') || f.endsWith('.exe') || f.endsWith('.msi'))
-      );
-      if (pending) {
-        installerPath = path.join(pendingDir, pending);
-        console.log('[Updater]   Found pending installer:', installerPath);
+      console.log('[Updater]   pending\\ contents:', pendingFiles);
+
+      // Extract semver from filename, e.g. "temp-Trigr-Setup-0.1.9.exe" → [0,1,9]
+      function parseVersion(filename) {
+        const m = filename.match(/(\d+)\.(\d+)\.(\d+)/);
+        return m ? [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])] : null;
+      }
+      function compareVersionDesc(a, b) {
+        const va = parseVersion(a) || [0, 0, 0];
+        const vb = parseVersion(b) || [0, 0, 0];
+        for (let i = 0; i < 3; i++) {
+          if (vb[i] !== va[i]) return vb[i] - va[i]; // descending
+        }
+        return 0;
+      }
+
+      const candidates = pendingFiles
+        .filter(f => f.endsWith('.exe') || f.endsWith('.msi'))
+        .sort(compareVersionDesc);
+
+      console.log('[Updater]   Candidates sorted by version (newest first):', candidates);
+
+      if (candidates.length > 0) {
+        installerPath = path.join(pendingDir, candidates[0]);
+        console.log('[Updater]   Selected newest pending installer:', installerPath);
         break;
       }
     } else {
-      console.log('[Updater]   No pending\ subdirectory');
+      console.log('[Updater]   No pending\\ subdirectory');
     }
 
     // 2. Fallback: installer.exe (or any .exe/.msi) directly in the base dir

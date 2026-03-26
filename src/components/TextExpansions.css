@@ -304,6 +304,48 @@
   background: var(--accent-glow);
 }
 
+/* ── Category inline rename ────────────────────────────────────────────────── */
+
+.te-cat-rename-wrap {
+  cursor: default;
+  padding: 0 6px;
+  gap: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  height: auto;
+  min-height: 34px;
+}
+
+.te-cat-rename-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--accent);
+  outline: none;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  width: 90px;
+  min-width: 50px;
+  max-width: 160px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.te-cat-rename-error {
+  font-size: 9px;
+  font-family: var(--font-display);
+  color: #ff5555;
+  line-height: 1;
+  padding-bottom: 3px;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .te-cat-rename-error {
+  color: #cc2020;
+}
+
 .te-cat-add-form {
   display: flex;
   align-items: center;
