@@ -2772,8 +2772,11 @@ function initAutoUpdater() {
   autoUpdater.autoDownload = false;              // never download without explicit user action
   autoUpdater.autoInstallOnAppQuit = true;       // apply cached update when app quits normally
   autoUpdater.allowDowngrade = false;            // never roll back to an older version
-  autoUpdater.disableDifferentialDownload = true; // skip blockmap diff — avoids stall when old blockmap is unavailable locally
   autoUpdater.disableWebInstaller = true;        // use the full NSIS installer, not the web stub
+  // NOTE: disableDifferentialDownload was previously set to true to work around a blockmap stall
+  // caused by the wrong cache directory path (trigr-updater vs keyforge-updater). That path issue
+  // is now fixed, so differential downloads are re-enabled. The blockmap is generated at build
+  // time and uploaded to GitHub releases alongside the installer.
   // Disable signature verification — build is not yet code-signed (Microsoft Trusted Signing pending).
   // Remove this line once signing is configured and the certificate is trusted.
   autoUpdater.verifyUpdateCodeSignature = () => Promise.resolve(undefined);

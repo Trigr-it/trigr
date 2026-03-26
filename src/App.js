@@ -945,11 +945,11 @@ function App() {
           <div className="update-banner">
             {updateInfo.phase === 'ready' ? (
               <>
-                <span className="update-banner__text">Trigr {updateInfo.version} ready — Trigr will close to install. Reopen manually when complete.</span>
+                <span className="update-banner__text">Trigr {updateInfo.version} ready — click to install and relaunch</span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"
                   onClick={async () => {
-                    console.log('[UpdateBanner] Update Now clicked — calling installUpdate()');
+                    console.log('[UpdateBanner] Restart Now clicked — calling installUpdate()');
                     try {
                       const result = await window.electronAPI?.installUpdate();
                       console.log('[UpdateBanner] installUpdate() response:', JSON.stringify(result));
@@ -958,7 +958,7 @@ function App() {
                     }
                   }}
                   type="button"
-                >Update Now</button>
+                >Restart Now</button>
                 <button
                   className="update-banner__btn update-banner__btn--later"
                   onClick={() => setUpdateInfo(prev => ({ ...prev, phase: 'dismissed' }))}
