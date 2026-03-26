@@ -3061,10 +3061,6 @@ function initAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;       // apply cached update when app quits normally
   autoUpdater.allowDowngrade = false;            // never roll back to an older version
   autoUpdater.disableWebInstaller = true;        // use the full NSIS installer, not the web stub
-  // NOTE: disableDifferentialDownload was previously set to true to work around a blockmap stall
-  // caused by the wrong cache directory path (trigr-updater vs keyforge-updater). That path issue
-  // is now fixed, so differential downloads are re-enabled. The blockmap is generated at build
-  // time and uploaded to GitHub releases alongside the installer.
   // Disable signature verification — build is not yet code-signed (Microsoft Trusted Signing pending).
   // Remove this line once signing is configured and the certificate is trusted.
   autoUpdater.verifyUpdateCodeSignature = () => Promise.resolve(undefined);
@@ -3099,17 +3095,26 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[Updater] Update downloaded:', JSON.stringify(info));
-    // Log the actual cache path so we can verify the file is on disk
+    console.log('[Updater] Update downloaded — full info:', JSON.stringify(info, null, 2));
+    console.log('[Updater] info.downloadedFile:', info.downloadedFile ?? '(not set)');
     try {
       const path = require('path');
       const fs = require('fs');
       const cachePath = path.join(app.getPath('appData'), app.getName() + '-updater');
       console.log('[Updater] Expected cache directory:', cachePath);
       console.log('[Updater] Cache exists:', fs.existsSync(cachePath));
-      if (fs.existsSync(cachePath)) console.log('[Updater] Cache contents:', fs.readdirSync(cachePath));
+      if (fs.existsSync(cachePath)) {
+        const top = fs.readdirSync(cachePath);
+        console.log('[Updater] Cache top-level contents:', top);
+        const pendingDir = path.join(cachePath, 'pending');
+        if (fs.existsSync(pendingDir)) {
+          console.log('[Updater] pending\\ contents:', fs.readdirSync(pendingDir));
+        } else {
+          console.log('[Updater] pending\\ subdirectory does not exist');
+        }
+      }
       console.log('[Updater] autoInstallOnAppQuit:', autoUpdater.autoInstallOnAppQuit);
-    } catch (e) { /* non-fatal */ }
+    } catch (e) { console.error('[Updater] cache inspection failed:', e?.message); }
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-downloaded');
     }
@@ -3231,6 +3236,33 @@ ipcMain.handle('install-update', async () => {
     // Ensure the app exits regardless
     app.quit();
     return { success: true };
+  }
+
+  console.log('[Updater] installerPath resolved to:', installerPath);
+  console.log('[Updater] File exists at that path:', fs.existsSync(installerPath));
+
+  // ── Promote pending blockmap to root ─────────────────────
+  // electron-updater only updates root/current.blockmap when using quitAndInstall().
+  // Because we use a custom spawn instead, we must do this ourselves before quitting.
+  // root/current.blockmap must reflect the version we're about to install so that
+  // the NEXT differential update has the correct baseline to diff against.
+  try {
+    const installerDir = path.dirname(installerPath);
+    const pendingBlockmap = path.join(installerDir, 'current.blockmap');
+    const cacheDir = path.dirname(installerDir); // pending/ is one level down from cache root
+    const rootBlockmap = path.join(cacheDir, 'current.blockmap');
+    const rootInstaller = path.join(cacheDir, 'installer.exe');
+    if (fs.existsSync(pendingBlockmap)) {
+      fs.copyFileSync(pendingBlockmap, rootBlockmap);
+      console.log('[Updater] Promoted pending blockmap → root current.blockmap');
+    } else {
+      console.warn('[Updater] No pending blockmap found at:', pendingBlockmap);
+    }
+    // Also update root installer.exe so root always reflects the installed version
+    fs.copyFileSync(installerPath, rootInstaller);
+    console.log('[Updater] Promoted pending installer → root installer.exe');
+  } catch (e) {
+    console.error('[Updater] Blockmap promotion failed (non-fatal):', e?.message);
   }
 
   try {
