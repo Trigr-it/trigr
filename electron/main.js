@@ -3223,8 +3223,14 @@ ipcMain.handle('install-update', async () => {
   }
 
   if (!installerPath) {
-    console.error('[Updater] No installer found in any candidate location');
-    return { success: false, error: 'No installer found' };
+    // No cached installer found — fall back to electron-updater's built-in quit-and-install.
+    // autoInstallOnAppQuit is already true, so quitAndInstall() will apply whatever
+    // electron-updater has staged even if we couldn't find the file ourselves.
+    console.warn('[Updater] No installer found in candidate locations — falling back to autoUpdater.quitAndInstall()');
+    try { autoUpdater.quitAndInstall(true, true); } catch (e) { console.error('[Updater] quitAndInstall fallback failed:', e?.message); }
+    // Ensure the app exits regardless
+    app.quit();
+    return { success: true };
   }
 
   try {
@@ -3240,10 +3246,11 @@ ipcMain.handle('install-update', async () => {
     }).unref();
     console.log('[Updater] Installer spawned — quitting app');
     app.quit();
-    return { success: true };
   } catch (err) {
-    console.error('[Updater] Failed to spawn installer:', err?.message ?? err);
-    return { success: false, error: err?.message ?? String(err) };
+    // Spawn failed — still quit; the staged update will apply on next launch
+    // via autoInstallOnAppQuit, or the user can restart manually.
+    console.error('[Updater] Failed to spawn installer:', err?.message ?? err, '— quitting anyway');
+    app.quit();
   }
 });
 

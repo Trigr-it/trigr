@@ -270,6 +270,7 @@ export default function TitleBar({
                     onDoubleClick={() => !isDefault && startRename(p)}
                     title={isGlobal ? (isActiveGlob ? 'Active global profile — currently the base profile when no app-specific profile is matched. Right-click to change.' : 'Global profile — active when no app-specific profile is in focus. Right-click to set as active base profile.') : undefined}
                   >
+                    {hasLink && <span className="profile-app-icon">🖥</span>}
                     {p}
                     {hasLink && <span className="profile-link-dot" title={basename(profileSettings[p].linkedApp)} />}
                     {isActiveGlob && <span className="profile-global-dot" title="Active global profile" />}

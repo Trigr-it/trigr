@@ -134,6 +134,14 @@
 }
 
 /* Small dot indicator on tabs that have a linked app */
+.profile-app-icon {
+  font-size: 11px;
+  margin-right: 4px;
+  line-height: 1;
+  vertical-align: middle;
+  opacity: 0.75;
+}
+
 .profile-link-dot {
   display: inline-block;
   width: 5px;

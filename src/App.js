@@ -984,15 +984,12 @@ function App() {
                 <span className="update-banner__text">Trigr {updateInfo.version} ready — click to install and relaunch</span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"
-                  onClick={async () => {
+                  onClick={() => {
                     setUpdateInfo(prev => ({ ...prev, phase: 'installing' }));
-                    console.log('[UpdateBanner] Restart Now clicked — calling installUpdate()');
-                    try {
-                      const result = await window.electronAPI?.installUpdate();
-                      console.log('[UpdateBanner] installUpdate() response:', JSON.stringify(result));
-                    } catch (err) {
-                      console.error('[UpdateBanner] installUpdate() threw:', err?.message ?? err);
-                    }
+                    // Fire-and-forget — app will quit so no response will arrive.
+                    // Do NOT await: an awaited ipcMain.handle call whose channel is
+                    // destroyed mid-flight hangs forever, keeping the app alive.
+                    window.electronAPI?.installUpdate();
                   }}
                   type="button"
                 >Restart Now</button>
