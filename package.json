@@ -1,6 +1,6 @@
 {
   "name": "keyforge",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Visual Hotkey & Macro Manager",
   "author": "Trigr",
   "main": "electron/main.js",
@@ -46,12 +46,13 @@
     "directories": {
       "output": "dist"
     },
-    "electronLanguages": ["en-US"],
+    "electronLanguages": [
+      "en-US"
+    ],
     "files": [
       "build/**/*",
       "electron/**/*",
       "node_modules/**/*",
-
       "!node_modules/koffi/build/koffi/darwin_arm64/**",
       "!node_modules/koffi/build/koffi/darwin_x64/**",
       "!node_modules/koffi/build/koffi/freebsd_arm64/**",
@@ -69,14 +70,11 @@
       "!node_modules/koffi/build/koffi/openbsd_x64/**",
       "!node_modules/koffi/build/koffi/win32_arm64/**",
       "!node_modules/koffi/build/koffi/win32_ia32/**",
-
       "!node_modules/koffi/src/**",
       "!node_modules/koffi/doc/**",
       "!node_modules/koffi/vendor/**",
-
       "!node_modules/@nut-tree-fork/libnut-darwin/**",
       "!node_modules/@nut-tree-fork/libnut-linux/**",
-
       "!**/*.map",
       "!**/*.md",
       "!**/test{s,}/**",
