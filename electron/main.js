@@ -3056,6 +3056,16 @@ function initAutoUpdater() {
   console.log('[Updater] Current app version:', app.getVersion());
   console.log('[Updater] Feed config:', JSON.stringify(autoUpdater.getFeedURL?.() ?? '(using package.json publish config)'));
 
+  // Log the actual runtime paths so we can verify cache dir resolution
+  console.log('[Updater] app.getPath("appData"):', app.getPath('appData'));
+  console.log('[Updater] app.getPath("userData"):', app.getPath('userData'));
+  console.log('[Updater] app.getName():', app.getName());
+  const { join: _join } = require('path');
+  const _expectedCache = _join(app.getPath('appData'), app.getName() + '-updater');
+  const _localCache    = _join(app.getPath('appData'), '..', 'Local', app.getName() + '-updater');
+  console.log('[Updater] Expected primary cache (appData):', _expectedCache);
+  console.log('[Updater] Expected Local cache:', _localCache);
+
   autoUpdater.logger = console;
   autoUpdater.autoDownload = false;              // never download without explicit user action
   autoUpdater.autoInstallOnAppQuit = true;       // apply cached update when app quits normally
@@ -3247,41 +3257,57 @@ ipcMain.handle('install-update', async () => {
   // root/current.blockmap must reflect the version we're about to install so that
   // the NEXT differential update has the correct baseline to diff against.
   try {
-    const installerDir = path.dirname(installerPath);
-    const pendingBlockmap = path.join(installerDir, 'current.blockmap');
-    const cacheDir = path.dirname(installerDir); // pending/ is one level down from cache root
-    const rootBlockmap = path.join(cacheDir, 'current.blockmap');
+    const installerDir  = path.dirname(installerPath);
+    const isInPending   = path.basename(installerDir).toLowerCase() === 'pending';
+    // cacheDir is always one level above pending/, or the same dir if installer is at root
+    const cacheDir      = isInPending ? path.dirname(installerDir) : installerDir;
+    const pendingDir    = path.join(cacheDir, 'pending');
+    const pendingBlockmap = path.join(pendingDir, 'current.blockmap');
+    const rootBlockmap  = path.join(cacheDir, 'current.blockmap');
     const rootInstaller = path.join(cacheDir, 'installer.exe');
+
+    console.log('[Updater] Promotion — installerDir:', installerDir);
+    console.log('[Updater] Promotion — isInPending:', isInPending);
+    console.log('[Updater] Promotion — cacheDir:', cacheDir);
+    console.log('[Updater] Promotion — pendingBlockmap exists:', fs.existsSync(pendingBlockmap));
+    console.log('[Updater] Promotion — rootBlockmap path:', rootBlockmap);
+
     if (fs.existsSync(pendingBlockmap)) {
       fs.copyFileSync(pendingBlockmap, rootBlockmap);
-      console.log('[Updater] Promoted pending blockmap → root current.blockmap');
+      console.log('[Updater] Promoted pending/current.blockmap → root current.blockmap');
     } else {
-      console.warn('[Updater] No pending blockmap found at:', pendingBlockmap);
+      console.warn('[Updater] No blockmap found at pending path:', pendingBlockmap);
+      console.warn('[Updater] pending/ contents:', fs.existsSync(pendingDir) ? fs.readdirSync(pendingDir) : '(dir missing)');
     }
-    // Also update root installer.exe so root always reflects the installed version
-    fs.copyFileSync(installerPath, rootInstaller);
-    console.log('[Updater] Promoted pending installer → root installer.exe');
+    // Only copy installer if it's not already the root file (avoid self-copy)
+    if (path.resolve(installerPath) !== path.resolve(rootInstaller)) {
+      fs.copyFileSync(installerPath, rootInstaller);
+      console.log('[Updater] Promoted installer → root installer.exe');
+    } else {
+      console.log('[Updater] Installer is already the root file — skipping copy');
+    }
   } catch (e) {
     console.error('[Updater] Blockmap promotion failed (non-fatal):', e?.message);
   }
 
   try {
     const { spawn } = require('child_process');
-    console.log('[Updater] Spawning installer silently:', installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated']);
-    // /SILENT   — NSIS installs without showing any UI
-    // --updated — marker arg so the relaunched app can detect it came from an auto-update
+    console.log('[Updater] About to spawn — final installerPath:', installerPath);
+    console.log('[Updater] File still exists immediately before spawn:', fs.existsSync(installerPath));
     // detached + stdio:ignore + unref() — installer runs fully independently;
     //   app.quit() can return immediately without waiting for it
-    spawn(installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
+    const child = spawn(installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
       detached: true,
-      stdio: 'ignore',
-    }).unref();
-    console.log('[Updater] Installer spawned — quitting app');
+      stdio:    'ignore',
+    });
+    console.log('[Updater] spawn() returned — child.pid:', child.pid);
+    child.unref();
+    console.log('[Updater] child.unref() called — quitting app');
     app.quit();
   } catch (err) {
     // Spawn failed — still quit; the staged update will apply on next launch
     // via autoInstallOnAppQuit, or the user can restart manually.
-    console.error('[Updater] Failed to spawn installer:', err?.message ?? err, '— quitting anyway');
+    console.error('[Updater] spawn() threw — code:', err?.code, 'path:', err?.path, 'message:', err?.message ?? err);
     app.quit();
   }
 });
