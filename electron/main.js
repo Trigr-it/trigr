@@ -2787,14 +2787,10 @@ function initAutoUpdater() {
 
   autoUpdater.on('update-available', (info) => {
     console.log('[Updater] Update available:', JSON.stringify(info));
-    // Sum all release file sizes to give the renderer an upfront download size estimate.
-    // With differentialPackage:true the actual download will be smaller (only changed blocks),
-    // but this gives a worst-case ceiling until the real transfer size is known.
-    const downloadSize = Array.isArray(info.files)
-      ? info.files.reduce((sum, f) => sum + (f.size || 0), 0)
-      : null;
+    // Do NOT send downloadSize — info.files contains the full installer size, not the differential
+    // size. The real download size comes from download-progress events once the transfer starts.
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-available', { version: info.version, downloadSize });
+      mainWindow.webContents.send('update-available', { version: info.version });
     }
   });
 
