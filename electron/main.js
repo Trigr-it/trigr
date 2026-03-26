@@ -3056,15 +3056,10 @@ function initAutoUpdater() {
   console.log('[Updater] Current app version:', app.getVersion());
   console.log('[Updater] Feed config:', JSON.stringify(autoUpdater.getFeedURL?.() ?? '(using package.json publish config)'));
 
-  // Log the actual runtime paths so we can verify cache dir resolution
-  console.log('[Updater] app.getPath("appData"):', app.getPath('appData'));
-  console.log('[Updater] app.getPath("userData"):', app.getPath('userData'));
-  console.log('[Updater] app.getName():', app.getName());
-  const { join: _join } = require('path');
-  const _expectedCache = _join(app.getPath('appData'), app.getName() + '-updater');
-  const _localCache    = _join(app.getPath('appData'), '..', 'Local', app.getName() + '-updater');
-  console.log('[Updater] Expected primary cache (appData):', _expectedCache);
-  console.log('[Updater] Expected Local cache:', _localCache);
+  // Path to the downloaded installer, set by update-downloaded and consumed by install-update.
+  // Using info.downloadedFile directly avoids guessing the cache dir location
+  // (electron-updater uses AppData\Local, but app.getPath('appData') returns AppData\Roaming).
+  let cachedInstallerPath = null;
 
   autoUpdater.logger = console;
   autoUpdater.autoDownload = false;              // never download without explicit user action
@@ -3105,26 +3100,8 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[Updater] Update downloaded — full info:', JSON.stringify(info, null, 2));
-    console.log('[Updater] info.downloadedFile:', info.downloadedFile ?? '(not set)');
-    try {
-      const path = require('path');
-      const fs = require('fs');
-      const cachePath = path.join(app.getPath('appData'), app.getName() + '-updater');
-      console.log('[Updater] Expected cache directory:', cachePath);
-      console.log('[Updater] Cache exists:', fs.existsSync(cachePath));
-      if (fs.existsSync(cachePath)) {
-        const top = fs.readdirSync(cachePath);
-        console.log('[Updater] Cache top-level contents:', top);
-        const pendingDir = path.join(cachePath, 'pending');
-        if (fs.existsSync(pendingDir)) {
-          console.log('[Updater] pending\\ contents:', fs.readdirSync(pendingDir));
-        } else {
-          console.log('[Updater] pending\\ subdirectory does not exist');
-        }
-      }
-      console.log('[Updater] autoInstallOnAppQuit:', autoUpdater.autoInstallOnAppQuit);
-    } catch (e) { console.error('[Updater] cache inspection failed:', e?.message); }
+    cachedInstallerPath = info.downloadedFile ?? null;
+    console.log('[Updater] Update downloaded. installerPath stored as:', cachedInstallerPath);
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-downloaded');
     }
@@ -3164,127 +3141,38 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('install-update', async () => {
   console.log('[Updater] install-update IPC handler called');
-  const os   = require('os');
   const path = require('path');
   const fs   = require('fs');
 
-  // Base cache dirs to check, in priority order.
-  // electron-updater saves to AppData\Local\<name>-updater on Windows.
-  const baseDirs = [
-    path.join(app.getPath('appData'), app.getName() + '-updater'),               // primary (confirmed)
-    path.join(app.getPath('appData'), '..', 'Local', app.getName() + '-updater'), // explicit Local fallback
-    path.join(os.tmpdir(), app.getName() + '-updater'),                           // legacy temp fallback
-  ];
+  const installerPath = cachedInstallerPath;
+  console.log('[Updater] cachedInstallerPath:', installerPath);
 
-  let installerPath = null;
-
-  for (const base of baseDirs) {
-    console.log('[Updater] Checking base dir:', base);
-
-    if (!fs.existsSync(base)) {
-      console.log('[Updater]   Does not exist — skipping');
-      continue;
-    }
-
-    const baseFiles = fs.readdirSync(base);
-    console.log('[Updater]   Contents:', baseFiles);
-
-    // 1. Preferred: pending\ subdirectory — contains the verified temp installer
-    //    e.g. pending\temp-Trigr-Setup-0.1.9.exe
-    //    Sort candidates by semver descending and pick the newest.
-    const pendingDir = path.join(base, 'pending');
-    if (fs.existsSync(pendingDir)) {
-      const pendingFiles = fs.readdirSync(pendingDir);
-      console.log('[Updater]   pending\\ contents:', pendingFiles);
-
-      // Extract semver from filename, e.g. "temp-Trigr-Setup-0.1.9.exe" → [0,1,9]
-      function parseVersion(filename) {
-        const m = filename.match(/(\d+)\.(\d+)\.(\d+)/);
-        return m ? [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])] : null;
-      }
-      function compareVersionDesc(a, b) {
-        const va = parseVersion(a) || [0, 0, 0];
-        const vb = parseVersion(b) || [0, 0, 0];
-        for (let i = 0; i < 3; i++) {
-          if (vb[i] !== va[i]) return vb[i] - va[i]; // descending
-        }
-        return 0;
-      }
-
-      const candidates = pendingFiles
-        .filter(f => f.endsWith('.exe') || f.endsWith('.msi'))
-        .sort(compareVersionDesc);
-
-      console.log('[Updater]   Candidates sorted by version (newest first):', candidates);
-
-      if (candidates.length > 0) {
-        installerPath = path.join(pendingDir, candidates[0]);
-        console.log('[Updater]   Selected newest pending installer:', installerPath);
-        break;
-      }
-    } else {
-      console.log('[Updater]   No pending\\ subdirectory');
-    }
-
-    // 2. Fallback: installer.exe (or any .exe/.msi) directly in the base dir
-    const stub = baseFiles.find(f => f === 'installer.exe' || f.endsWith('.exe') || f.endsWith('.msi'));
-    if (stub) {
-      installerPath = path.join(base, stub);
-      console.log('[Updater]   Found base-dir installer (fallback):', installerPath);
-      break;
-    }
-
-    console.log('[Updater]   No installer found in this base dir');
-  }
-
-  if (!installerPath) {
-    // No cached installer found — fall back to electron-updater's built-in quit-and-install.
-    // autoInstallOnAppQuit is already true, so quitAndInstall() will apply whatever
-    // electron-updater has staged even if we couldn't find the file ourselves.
-    console.warn('[Updater] No installer found in candidate locations — falling back to autoUpdater.quitAndInstall()');
+  if (!installerPath || !fs.existsSync(installerPath)) {
+    console.error('[Updater] Installer not found at cached path — cannot install:', installerPath);
+    // Fall back to electron-updater's own quit-and-install as a last resort
+    console.warn('[Updater] Falling back to autoUpdater.quitAndInstall()');
     try { autoUpdater.quitAndInstall(true, true); } catch (e) { console.error('[Updater] quitAndInstall fallback failed:', e?.message); }
-    // Ensure the app exits regardless
     app.quit();
-    return { success: true };
+    return;
   }
-
-  console.log('[Updater] installerPath resolved to:', installerPath);
-  console.log('[Updater] File exists at that path:', fs.existsSync(installerPath));
 
   // ── Promote pending blockmap to root ─────────────────────
   // electron-updater only updates root/current.blockmap when using quitAndInstall().
-  // Because we use a custom spawn instead, we must do this ourselves before quitting.
-  // root/current.blockmap must reflect the version we're about to install so that
-  // the NEXT differential update has the correct baseline to diff against.
+  // Because we use a custom spawn, we do it here so the NEXT differential update
+  // has the correct baseline to diff against.
   try {
-    const installerDir  = path.dirname(installerPath);
-    const isInPending   = path.basename(installerDir).toLowerCase() === 'pending';
-    // cacheDir is always one level above pending/, or the same dir if installer is at root
-    const cacheDir      = isInPending ? path.dirname(installerDir) : installerDir;
-    const pendingDir    = path.join(cacheDir, 'pending');
+    const pendingDir      = path.dirname(installerPath);
+    const cacheDir        = path.dirname(pendingDir);
     const pendingBlockmap = path.join(pendingDir, 'current.blockmap');
-    const rootBlockmap  = path.join(cacheDir, 'current.blockmap');
-    const rootInstaller = path.join(cacheDir, 'installer.exe');
-
-    console.log('[Updater] Promotion — installerDir:', installerDir);
-    console.log('[Updater] Promotion — isInPending:', isInPending);
+    const rootBlockmap    = path.join(cacheDir,   'current.blockmap');
+    console.log('[Updater] Promotion — pendingDir:', pendingDir);
     console.log('[Updater] Promotion — cacheDir:', cacheDir);
     console.log('[Updater] Promotion — pendingBlockmap exists:', fs.existsSync(pendingBlockmap));
-    console.log('[Updater] Promotion — rootBlockmap path:', rootBlockmap);
-
     if (fs.existsSync(pendingBlockmap)) {
       fs.copyFileSync(pendingBlockmap, rootBlockmap);
       console.log('[Updater] Promoted pending/current.blockmap → root current.blockmap');
     } else {
-      console.warn('[Updater] No blockmap found at pending path:', pendingBlockmap);
-      console.warn('[Updater] pending/ contents:', fs.existsSync(pendingDir) ? fs.readdirSync(pendingDir) : '(dir missing)');
-    }
-    // Only copy installer if it's not already the root file (avoid self-copy)
-    if (path.resolve(installerPath) !== path.resolve(rootInstaller)) {
-      fs.copyFileSync(installerPath, rootInstaller);
-      console.log('[Updater] Promoted installer → root installer.exe');
-    } else {
-      console.log('[Updater] Installer is already the root file — skipping copy');
+      console.warn('[Updater] No pending blockmap found — skipping promotion');
     }
   } catch (e) {
     console.error('[Updater] Blockmap promotion failed (non-fatal):', e?.message);
@@ -3292,22 +3180,16 @@ ipcMain.handle('install-update', async () => {
 
   try {
     const { spawn } = require('child_process');
-    console.log('[Updater] About to spawn — final installerPath:', installerPath);
-    console.log('[Updater] File still exists immediately before spawn:', fs.existsSync(installerPath));
-    // detached + stdio:ignore + unref() — installer runs fully independently;
-    //   app.quit() can return immediately without waiting for it
+    console.log('[Updater] Spawning:', installerPath);
     const child = spawn(installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
       detached: true,
       stdio:    'ignore',
     });
     console.log('[Updater] spawn() returned — child.pid:', child.pid);
     child.unref();
-    console.log('[Updater] child.unref() called — quitting app');
     app.quit();
   } catch (err) {
-    // Spawn failed — still quit; the staged update will apply on next launch
-    // via autoInstallOnAppQuit, or the user can restart manually.
-    console.error('[Updater] spawn() threw — code:', err?.code, 'path:', err?.path, 'message:', err?.message ?? err);
+    console.error('[Updater] spawn() threw — code:', err?.code, 'message:', err?.message ?? err);
     app.quit();
   }
 });
