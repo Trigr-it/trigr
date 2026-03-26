@@ -2942,12 +2942,12 @@ ipcMain.handle('install-update', async () => {
 
   try {
     const { spawn } = require('child_process');
-    console.log('[Updater] Spawning installer silently:', installerPath, ['/SILENT', '--updated']);
+    console.log('[Updater] Spawning installer silently:', installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated']);
     // /SILENT   — NSIS installs without showing any UI
     // --updated — marker arg so the relaunched app can detect it came from an auto-update
     // detached + stdio:ignore + unref() — installer runs fully independently;
     //   app.quit() can return immediately without waiting for it
-    spawn(installerPath, ['/SILENT', '--updated'], {
+    spawn(installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
       detached: true,
       stdio: 'ignore',
     }).unref();
