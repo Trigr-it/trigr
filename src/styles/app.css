@@ -292,3 +292,18 @@
 .update-banner__btn--later:hover {
   background: rgba(255,255,255,0.1);
 }
+
+.update-banner__btn--restart:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+@keyframes update-dots {
+  0%   { content: '.';   }
+  33%  { content: '..';  }
+  66%  { content: '...'; }
+}
+.update-banner__dots::after {
+  content: '...';
+  animation: update-dots 1.2s steps(1, end) infinite;
+}

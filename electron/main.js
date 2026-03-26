@@ -131,7 +131,50 @@ const _pausedTrayImage = (() => {
 
 let _normalTrayImage = null; // set in createTray(), used to restore on unpause
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev      = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDemoMode = process.argv.includes('--demo-mode');
+
+// ── Demo config ───────────────────────────────────────────────────────────────
+// Used when launched with --demo-mode. Never written to disk.
+const DEMO_CONFIG = isDemoMode ? {
+  profiles: ['Default', 'BricsCAD'],
+  activeGlobalProfile: 'Default',
+  profileSettings: {
+    BricsCAD: { linkedApp: 'C:\\Program Files\\Bricsys\\BricsCAD V24 en_US\\bricscad.exe' },
+  },
+  assignments: {
+    // Default — Ctrl layer
+    'Default::Ctrl::KeyE':   { type: 'text',   label: 'Email Signature',  data: { text: 'Kind regards,\nYour Name\nYour Company | your@email.com' } },
+    'Default::Ctrl::KeyS':   { type: 'hotkey', label: 'Save All',         data: { key: 'S', modifiers: ['Ctrl', 'Shift'] } },
+    'Default::Ctrl::KeyZ':   { type: 'text',   label: 'Meeting Template', data: { text: 'Date: \nAttendees: \nAgenda:\n1. \n2. \nActions:\n' } },
+    // Default — Alt layer
+    'Default::Alt::Backquote': { type: 'app',  label: 'Open Notepad',     data: { path: 'C:\\Windows\\System32\\notepad.exe' } },
+    'Default::Alt::KeyC':    { type: 'url',    label: 'Open Confluence',  data: { url: 'https://confluence.example.com' } },
+    // Default — Shift layer
+    'Default::Shift::F5':    { type: 'macro',  label: 'Draw Pline',       data: { steps: [{ type: 'text', value: 'pline' }, { type: 'key', value: 'Enter' }] } },
+    'Default::Shift::F3':    { type: 'macro',  label: 'Draw Circle',      data: { steps: [{ type: 'text', value: 'circle' }, { type: 'key', value: 'Enter' }] } },
+    // BricsCAD — bare key assignments (app-linked profile)
+    'BricsCAD::BARE::F2':    { type: 'text',   label: 'Snap On/Off',      data: { text: 'snapmode' } },
+    'BricsCAD::BARE::F8':    { type: 'text',   label: 'Ortho Mode',       data: { text: 'orthomode' } },
+    'BricsCAD::BARE::F3':    { type: 'text',   label: 'Object Snap',      data: { text: 'osmode' } },
+    'BricsCAD::BARE::Delete':{ type: 'hotkey', label: 'Erase',            data: { key: 'Delete', modifiers: [] } },
+    // Text expansions (global)
+    'GLOBAL::EXPANSION::signoff': { type: 'text', label: 'signoff', data: { text: 'Kind regards,\nYour Name', triggerMode: 'space' } },
+    'GLOBAL::EXPANSION::node3d':  { type: 'text', label: 'node3d',  data: { text: 'Link to view 3D model: https://viewer.example.com/model?id=abc123', triggerMode: 'space' } },
+    'GLOBAL::EXPANSION::mtg':     { type: 'text', label: 'mtg',     data: { text: 'Meeting notes — ', triggerMode: 'space' } },
+  },
+  expansionCategories: [
+    { name: 'Work', colour: '#4a9eff' },
+    { name: 'CAD', colour: '#e8a020' },
+  ],
+  globalVariables: {},
+  myDetails: {},
+  autocorrectEntries: [],
+  autocorrectEnabled: false,
+  theme: 'dark',
+  hasSeenWelcome: true,
+  macrosEnabledOnStartup: true,
+} : null;
 
 // Windows taskbar identity — must be set before app.whenReady()
 app.setAppUserModelId('com.trigr.app');
@@ -2228,6 +2271,7 @@ ipcMain.on('window-close', () => hideWindowToTray());
 
 // Config load/save
 ipcMain.handle('load-config', () => {
+  if (isDemoMode) return { ...DEMO_CONFIG, _restoredFrom: null };
   const { config, restoredFrom } = loadConfigSafe();
   if (config) {
     if (!restoredFrom) {
@@ -2244,6 +2288,7 @@ ipcMain.handle('load-config', () => {
   return null;
 });
 ipcMain.handle('save-config', (event, config) => {
+  if (isDemoMode) return true; // silently discard — never write demo data to disk
   // Always load existing config first so that partial saves (e.g. { numpadOpen: true }
   // or { tipsHidden: true }) only update their specific fields and never wipe the rest.
   const existing = loadConfig() || {};
@@ -2492,6 +2537,7 @@ ipcMain.handle('get-engine-status', () => ({
   macrosEnabled,
   activeProfile,
   globalPauseToggleKey,
+  isDemoMode,
 }));
 
 // ── Help window ──────────────────────────────────────────────────────────
@@ -2548,6 +2594,7 @@ ipcMain.on('set-startup-enabled', (_event, enabled) => {
 
 // ── Backup: export config ────────────────────────────────────────────────
 ipcMain.handle('export-config', async () => {
+  if (isDemoMode) return { ok: false, error: 'Export is disabled in demo mode.' };
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     title: 'Export Trigr Config',
@@ -2556,7 +2603,20 @@ ipcMain.handle('export-config', async () => {
   });
   if (canceled || !filePath) return { ok: false };
   try {
-    const config = loadConfig() || {};
+    // Use loadConfigSafe() so a corrupt main config falls back to a backup rather
+    // than silently exporting an empty object.
+    const { config, restoredFrom } = loadConfigSafe();
+    if (!config) {
+      console.error('[KeyForge] Export failed — could not load any valid config');
+      return { ok: false, error: 'No valid config found to export.' };
+    }
+    if (restoredFrom) {
+      console.warn(`[KeyForge] Export — main config unreadable, using backup: ${restoredFrom}`);
+    }
+    const assignmentKeys = Object.keys(config.assignments || {});
+    const hotkeyCount    = assignmentKeys.filter(k => !k.startsWith('GLOBAL::EXPANSION::')).length;
+    const expansionCount = assignmentKeys.length - hotkeyCount;
+    console.log(`[KeyForge] Export — ${assignmentKeys.length} assignments (${hotkeyCount} hotkeys, ${expansionCount} expansions), ${(config.profiles || []).length} profile(s)`);
     fs.writeFileSync(filePath, JSON.stringify(config, null, 2), 'utf-8');
     console.log(`[KeyForge] Config exported to: ${filePath}`);
     return { ok: true };
@@ -2568,6 +2628,7 @@ ipcMain.handle('export-config', async () => {
 
 // ── Backup: import config ────────────────────────────────────────────────
 ipcMain.handle('import-config', async () => {
+  if (isDemoMode) return { ok: false, error: 'Import is disabled in demo mode.' };
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     title: 'Import Trigr Config',
     properties: ['openFile'],
@@ -2581,11 +2642,27 @@ ipcMain.handle('import-config', async () => {
     if (typeof config !== 'object' || config === null || typeof config.assignments !== 'object') {
       return { ok: false, error: 'Invalid Trigr config file — missing assignments object.' };
     }
+    const assignmentKeys = Object.keys(config.assignments);
+    const hotkeyCount    = assignmentKeys.filter(k => !k.startsWith('GLOBAL::EXPANSION::')).length;
+    const expansionCount = assignmentKeys.length - hotkeyCount;
+    console.log(`[KeyForge] Import — file: ${filePaths[0]}`);
+    console.log(`[KeyForge] Import — ${assignmentKeys.length} assignments in file (${hotkeyCount} hotkeys, ${expansionCount} expansions), ${(config.profiles || []).length} profile(s)`);
     // Backup current config before overwriting so the import is always recoverable
     const current = loadConfig();
     if (current) createTimestampedBackup(current);
-    console.log(`[KeyForge] Config import validated: ${filePaths[0]}`);
-    return { ok: true, config };
+    // Write the imported config directly to disk now (same as restore-backup).
+    // This ensures assignments are persisted before the renderer does any further saves,
+    // eliminating any risk of a stale renderer-side closure overwriting the imported data.
+    const toSave = { ...config, hasSeenWelcome: true };
+    const writeOk = saveConfig(toSave);
+    if (writeOk) {
+      updateLastKnownGood(toSave);
+      console.log(`[KeyForge] Import — written to disk: ${assignmentKeys.length} assignments`);
+    } else {
+      console.error('[KeyForge] Import — disk write failed');
+      return { ok: false, error: 'Could not write imported config to disk.' };
+    }
+    return { ok: true, config: toSave };
   } catch (e) {
     console.error('[KeyForge] Import failed:', e.message);
     return { ok: false, error: `Could not read file: ${e.message}` };
@@ -2890,7 +2967,7 @@ function createWindow() {
     mainWindow.setOverlayIcon(null, '');
 
     // Load saved config and start listening
-    const config = loadConfig();
+    const config = isDemoMode ? DEMO_CONFIG : loadConfig();
     if (config?.assignments) {
       activeAssignments   = config.assignments;
       // Always start on the global (Default) profile — do not restore last-used profile
@@ -2934,7 +3011,7 @@ function createWindow() {
       nutjsAvailable,
     });
     // Register overlay toggle hotkey
-    const cfg = loadConfig() || {};
+    const cfg = (isDemoMode ? DEMO_CONFIG : loadConfig()) || {};
     if (cfg.searchOverlayHotkey) {
       // Migrate Win+Space → Ctrl+Space (Win+Space is reserved by Windows for IME switching)
       const migratedHotkey = cfg.searchOverlayHotkey === 'Win+Space' ? 'Ctrl+Space' : cfg.searchOverlayHotkey;

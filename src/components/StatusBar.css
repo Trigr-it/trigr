@@ -112,3 +112,15 @@
   70%  { opacity: 1; }
   100% { opacity: 0; }
 }
+
+
+.demo-mode-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #1a1a1a;
+  background: #e8a020;
+  border-radius: 3px;
+  padding: 1px 5px;
+  line-height: 1.4;
+}

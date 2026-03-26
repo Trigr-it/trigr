@@ -710,6 +710,15 @@ function App() {
   // sidebar item should only focus that key/view without disturbing the
   // current modifier state.
   const handleSelectAssignment = useCallback((keyId, combo) => {
+    // Activate the modifier layer that matches this assignment so that
+    // getKeyAssignment() (which guards on activeModifiers.length > 0) can look
+    // up the correct entry and MacroPanel receives the right assignment object.
+    if (combo === 'BARE') {
+      setActiveModifiers(['BARE']);
+    } else if (combo) {
+      // combo is already sorted by comboString(), so splitting and re-sorting is safe
+      setActiveModifiers(combo.split('+'));
+    }
     setSelectedKey(keyId);
     // Switch view to match the selected key type
     setActiveView(keyId.startsWith('MOUSE_') ? 'mouse' : 'keyboard');
@@ -793,8 +802,14 @@ function App() {
     if (!confirmed) return;
 
     const cfg = result.config;
+    // Reset interaction state so the sidebar and MacroPanel start clean
+    setSelectedKey(null);
+    setActiveModifiers([]);
     // Apply all imported state
     const imported = cfg.assignments || {};
+    const importedHotkeyCount    = Object.keys(imported).filter(k => !k.startsWith('GLOBAL::EXPANSION::')).length;
+    const importedExpansionCount = Object.keys(imported).length - importedHotkeyCount;
+    console.log(`[KeyForge] Import applied — ${Object.keys(imported).length} assignments (${importedHotkeyCount} hotkeys, ${importedExpansionCount} expansions)`);
     setAssignments(imported);
     setProfiles(cfg.profiles?.length ? cfg.profiles : ['Default']);
     setActiveProfile(cfg.activeProfile || 'Default');
@@ -807,8 +822,7 @@ function App() {
     setAutocorrectEnabled(importedAc);
     window.electronAPI?.updateAutocorrectEnabled(importedAc);
     setMacrosEnabledOnStartup(cfg.macrosEnabledOnStartup ?? true);
-    // Persist and sync engine
-    window.electronAPI?.saveConfig({ ...cfg, hasSeenWelcome: true });
+    // main.js already wrote the imported config to disk — only sync the engine
     window.electronAPI?.updateAssignments(imported, cfg.activeProfile || 'Default');
     window.electronAPI?.updateProfileSettings(cfg.profileSettings || {});
     showNotification('Config imported successfully');
@@ -822,6 +836,9 @@ function App() {
       return;
     }
     const cfg = result.config;
+    // Reset interaction state so the sidebar and MacroPanel start clean
+    setSelectedKey(null);
+    setActiveModifiers([]);
     const restored = cfg.assignments || {};
     setAssignments(restored);
     setProfiles(cfg.profiles?.length ? cfg.profiles : ['Default']);
@@ -957,12 +974,18 @@ function App() {
         );
         return (
           <div className="update-banner">
-            {updateInfo.phase === 'ready' ? (
+            {updateInfo.phase === 'installing' ? (
+              <>
+                <span className="update-banner__text">Installing update — Trigr will close shortly<span className="update-banner__dots" /></span>
+                <button className="update-banner__btn update-banner__btn--restart" type="button" disabled>Installing…</button>
+              </>
+            ) : updateInfo.phase === 'ready' ? (
               <>
                 <span className="update-banner__text">Trigr {updateInfo.version} ready — click to install and relaunch</span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"
                   onClick={async () => {
+                    setUpdateInfo(prev => ({ ...prev, phase: 'installing' }));
                     console.log('[UpdateBanner] Restart Now clicked — calling installUpdate()');
                     try {
                       const result = await window.electronAPI?.installUpdate();

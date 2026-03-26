@@ -9,6 +9,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "electron": "electron .",
+    "demo": "electron . --demo-mode",
     "electron-dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
     "rebuild": "electron-rebuild --arch x64",
     "gen-icon": "node scripts/gen-tray-icon.js && node scripts/gen-app-icon.js",

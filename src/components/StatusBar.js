@@ -2,7 +2,7 @@ import React from 'react';
 import './StatusBar.css';
 
 export default function StatusBar({ selectedKey, currentCombo, macrosEnabled, assignmentCount, notification, engineStatus, lastFired, appVersion, globalPauseToggleKey }) {
-  const { uiohookAvailable, nutjsAvailable } = engineStatus || {};
+  const { uiohookAvailable, nutjsAvailable, isDemoMode } = engineStatus || {};
 
   function pauseHotkeyLabel(combo) {
     if (!combo) return null;
@@ -64,6 +64,12 @@ export default function StatusBar({ selectedKey, currentCombo, macrosEnabled, as
         </span>
         <span className="status-sep">·</span>
         <span className="status-info">Trigr {appVersion ? `v${appVersion}` : 'v…'}</span>
+        {isDemoMode && (
+          <>
+            <span className="status-sep">·</span>
+            <span className="demo-mode-badge">DEMO MODE</span>
+          </>
+        )}
       </div>
 
       {notification && (
