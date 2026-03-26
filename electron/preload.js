@@ -100,6 +100,11 @@ window.electronAPI = {
   onOverlayFired: (callback) =>
     ipcRenderer.on('overlay-fired', (event, data) => callback(data)),
 
+  // Global pause toggle
+  setPauseHotkey:      (combo) => ipcRenderer.invoke('set-global-pause-key', combo),
+  clearPauseHotkey:    ()      => ipcRenderer.send('clear-global-pause-key'),
+  checkHotkeyConflict: (combo) => ipcRenderer.invoke('check-hotkey-conflict', combo),
+
   // Auto-updater
   onUpdateAvailable:  (callback) => ipcRenderer.on('update-available',  (event, data) => callback(data)),
   onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (event, data) => callback(data)),

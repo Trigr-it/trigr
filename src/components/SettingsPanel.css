@@ -690,3 +690,33 @@
   background: var(--bg-hover);
 }
 
+.settings-pause-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-pause-stack .settings-qs-hotkey-ctrl {
+  justify-content: flex-start;
+}
+
+.settings-danger-btn {
+  color: #e05555;
+  border-color: rgba(224, 85, 85, 0.35);
+}
+.settings-danger-btn:hover {
+  background: rgba(224, 85, 85, 0.12);
+  border-color: #e05555;
+  color: #e05555;
+}
+
+.settings-conflict-warn {
+  margin-top: 6px;
+  padding: 5px 10px;
+  background: rgba(224, 85, 85, 0.1);
+  border: 1px solid rgba(224, 85, 85, 0.3);
+  border-radius: var(--radius-md);
+  color: #e05555;
+  font-size: 11px;
+}
+

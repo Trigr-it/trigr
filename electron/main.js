@@ -1,8 +1,135 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const zlib = require('zlib');
 const { exec, spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
+
+// ── Shared PNG encoder ────────────────────────────────────────────────────
+const _PNG_CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c;
+  }
+  return t;
+})();
+function _pngCrc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = _PNG_CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function _pngChunk(type, data) {
+  const len = Buffer.alloc(4); len.writeUInt32BE(data.length, 0);
+  const tb  = Buffer.from(type, 'ascii');
+  const crc = Buffer.alloc(4); crc.writeUInt32BE(_pngCrc32(Buffer.concat([tb, data])), 0);
+  return Buffer.concat([len, tb, data, crc]);
+}
+function _buildPNG(size, getPixel) {
+  const rowBytes = size * 4;
+  const raw = Buffer.alloc(size * (rowBytes + 1));
+  for (let y = 0; y < size; y++) {
+    raw[y * (rowBytes + 1)] = 0;
+    for (let x = 0; x < size; x++) {
+      const [r, g, b, a] = getPixel(x, y);
+      if (a === 0) continue;
+      const off = y * (rowBytes + 1) + 1 + x * 4;
+      raw[off] = r; raw[off+1] = g; raw[off+2] = b; raw[off+3] = a;
+    }
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8; ihdr[9] = 6; // 8-bit RGBA
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    _pngChunk('IHDR', ihdr),
+    _pngChunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
+    _pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+// ── Trigr logo renderer (matches gen-app-icon.js / TitleBar.js SVG) ───────
+const _LOGO_ACCENT = [232, 160, 32]; // #e8a020
+const _LOGO_RECTS  = [
+  { x: 2,  y: 5,  w: 6,  h: 4, rx: 1.5, op: 0.9 },
+  { x: 10, y: 5,  w: 4,  h: 4, rx: 1.5, op: 0.6 },
+  { x: 16, y: 5,  w: 2,  h: 4, rx: 1.0, op: 0.4 },
+  { x: 2,  y: 11, w: 4,  h: 4, rx: 1.5, op: 0.5 },
+  { x: 8,  y: 11, w: 10, h: 4, rx: 1.5, op: 0.8 },
+];
+function _insideRRect(fx, fy, rx, ry, rw, rh, radius) {
+  if (fx < rx || fx > rx + rw || fy < ry || fy > ry + rh) return false;
+  const dx = Math.max(rx + radius - fx, 0, fx - (rx + rw - radius));
+  const dy = Math.max(ry + radius - fy, 0, fy - (ry + rh - radius));
+  return dx * dx + dy * dy <= radius * radius;
+}
+function _logoPixel(px, py, size) {
+  const scale = size / 20, S = 4, step = 1/S, half = step/2;
+  let hits = 0, maxOp = 0;
+  for (let sy = 0; sy < S; sy++) for (let sx = 0; sx < S; sx++) {
+    const fx = px + half + sx * step, fy = py + half + sy * step;
+    for (const r of _LOGO_RECTS)
+      if (_insideRRect(fx, fy, r.x*scale, r.y*scale, r.w*scale, r.h*scale, r.rx*scale)) { hits++; break; }
+  }
+  if (hits === 0) return [0, 0, 0, 0];
+  for (const r of _LOGO_RECTS)
+    if (_insideRRect(px+.5, py+.5, r.x*scale, r.y*scale, r.w*scale, r.h*scale, r.rx*scale) && r.op > maxOp) maxOp = r.op;
+  return [..._LOGO_ACCENT, Math.round(hits / (S*S) * maxOp * 255)];
+}
+
+// ── Pause overlay icon — taskbar window button badge (32×32) ───────────────
+// Full circle with pause bars; transparent background so Windows composites it.
+const _pauseOverlayImage = (() => {
+  const SIZE = 32;
+  const cx = 15.5, cy = 15.5, R = 13.5;
+  const BARS = [{ x1: 9, y1: 8, x2: 13, y2: 23 }, { x1: 18, y1: 8, x2: 22, y2: 23 }];
+  const S = 4;
+  function circleCov(px, py) {
+    let h = 0; const step = 1/S, half = step/2;
+    for (let sy = 0; sy < S; sy++) for (let sx = 0; sx < S; sx++) {
+      const fx = px + half + sx*step - cx, fy = py + half + sy*step - cy;
+      if (fx*fx + fy*fy <= R*R) h++;
+    }
+    return h / (S*S);
+  }
+  function inBar(px, py) { return BARS.some(b => px >= b.x1 && px <= b.x2 && py >= b.y1 && py <= b.y2); }
+  const buf = _buildPNG(SIZE, (x, y) => {
+    const cov = circleCov(x, y);
+    if (cov === 0) return [0, 0, 0, 0];
+    return inBar(x, y) ? [255, 255, 255, Math.round(cov*235)] : [0, 0, 0, Math.round(cov*175)];
+  });
+  return nativeImage.createFromBuffer(buf, { scaleFactor: 1.0 });
+})();
+
+// ── Paused tray icon — 32×32 Trigr logo + pause badge bottom-right ────────
+const _pausedTrayImage = (() => {
+  const SIZE = 32;
+  // Badge: small circle in bottom-right corner
+  const BCX = 24.5, BCY = 24.5, BR = 7.5;
+  const PBARS = [{ x1: 20, y1: 19, x2: 22, y2: 30 }, { x1: 25, y1: 19, x2: 27, y2: 30 }];
+  const S = 4;
+  function badgeCov(px, py) {
+    let h = 0; const step = 1/S, half = step/2;
+    for (let sy = 0; sy < S; sy++) for (let sx = 0; sx < S; sx++) {
+      const fx = px + half + sx*step - BCX, fy = py + half + sy*step - BCY;
+      if (fx*fx + fy*fy <= BR*BR) h++;
+    }
+    return h / (S*S);
+  }
+  function inPauseBar(px, py) { return PBARS.some(b => px >= b.x1 && px <= b.x2 && py >= b.y1 && py <= b.y2); }
+  const buf = _buildPNG(SIZE, (x, y) => {
+    const bc = badgeCov(x, y);
+    if (bc > 0) {
+      // Badge takes priority over logo — dark bg or white bar
+      return inPauseBar(x, y) ? [255, 255, 255, Math.round(bc*230)] : [0, 0, 0, Math.round(bc*210)];
+    }
+    return _logoPixel(x, y, SIZE);
+  });
+  return nativeImage.createFromBuffer(buf, { scaleFactor: 1.0 });
+})();
+
+let _normalTrayImage = null; // set in createTray(), used to restore on unpause
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -23,6 +150,8 @@ let fillInWindowReady     = false; // true once the renderer has sent 'fill-in-r
 let fillInPending         = false; // true while a fill-in prompt is active
 let _fillInSubmitHandler  = null;  // current submit listener ref, for cleanup on window close
 let searchOverlayHotkey   = 'Ctrl+Space'; // default; overridden from config
+let globalPauseToggleKey  = null;         // null = disabled; e.g. 'Ctrl+Shift+KeyP'
+let pauseHotkeyId         = null;         // non-null when registered
 let tray          = null;
 let isQuitting    = false;   // set true before app.quit() so close → destroy not hide
 let hasShownBalloon = false; // one-time "running in background" notification
@@ -392,6 +521,7 @@ const MOD_WIN      = 0x0008;
 const MOD_NOREPEAT = 0x4000;
 const WM_HOTKEY    = 0x0312;
 const OVERLAY_HOTKEY_ID     = 0xFFFF; // fixed ID reserved for the overlay toggle hotkey
+const PAUSE_HOTKEY_ID       = 0xFFFE; // fixed ID reserved for the global pause toggle hotkey
 
 // ─────────────────────────────────────────────
 // KOFFI / RegisterHotKey  (Windows only, graceful — app works without it)
@@ -541,8 +671,10 @@ function applyMacrosPause(paused) {
   }
   updateTrayTooltip();
   buildTrayMenu();
+  mainWindow?.setOverlayIcon(paused ? _pauseOverlayImage : null, paused ? 'Trigr Paused' : '');
+  if (tray && _normalTrayImage) tray.setImage(paused ? _pausedTrayImage : _normalTrayImage);
   mainWindow?.webContents.send('engine-status', {
-    uiohookAvailable, nutjsAvailable, macrosEnabled, activeProfile,
+    uiohookAvailable, nutjsAvailable, macrosEnabled, activeProfile, globalPauseToggleKey,
   });
 }
 
@@ -2075,8 +2207,8 @@ function createTray() {
     ? path.join(process.resourcesPath, 'app-icon.png')
     : path.join(__dirname, '..', 'public', 'app-icon.png');
 
-  const icon = nativeImage.createFromPath(iconPath);
-  tray = new Tray(icon);
+  _normalTrayImage = nativeImage.createFromPath(iconPath);
+  tray = new Tray(_normalTrayImage);
   tray.setToolTip('Trigr — Macro Engine Active'); // updateTrayTooltip() called after tray is set
   tray.on('click', showWindow);
   buildTrayMenu();
@@ -2126,6 +2258,7 @@ ipcMain.handle('save-config', (event, config) => {
     overlayShowAll:           config.overlayShowAll           ?? existing.overlayShowAll,
     overlayCloseAfterFiring:  config.overlayCloseAfterFiring  ?? existing.overlayCloseAfterFiring,
     overlayIncludeAutocorrect:config.overlayIncludeAutocorrect?? existing.overlayIncludeAutocorrect,
+    globalPauseToggleKey:     config.globalPauseToggleKey     !== undefined ? config.globalPauseToggleKey : (existing.globalPauseToggleKey ?? null),
   };
   if (isSignificantChange(config, existing)) {
     createTimestampedBackup(existing);
@@ -2306,6 +2439,31 @@ ipcMain.on('update-search-settings', (_event, settings) => {
   console.log('[KeyForge] Search settings updated');
 });
 
+// ── Global Pause Toggle hotkey IPC ──────────────────────────────────────────
+ipcMain.handle('set-global-pause-key', (_event, combo) => {
+  globalPauseToggleKey = combo || null;
+  registerPauseHotkey(globalPauseToggleKey);
+  const existing = loadConfig() || {};
+  saveConfig({ ...existing, globalPauseToggleKey });
+  console.log(`[KeyForge] Pause hotkey set: ${globalPauseToggleKey}`);
+  return { ok: true };
+});
+
+ipcMain.on('clear-global-pause-key', () => {
+  globalPauseToggleKey = null;
+  unregisterPauseHotkey();
+  const existing = loadConfig() || {};
+  saveConfig({ ...existing, globalPauseToggleKey: null });
+  console.log('[KeyForge] Pause hotkey cleared');
+});
+
+ipcMain.handle('check-hotkey-conflict', (_event, combo) => {
+  if (!combo) return { conflict: false };
+  if (combo === searchOverlayHotkey) return { conflict: true, with: 'Quick Search overlay' };
+  if (combo === globalPauseToggleKey) return { conflict: true, with: 'Global Pause Toggle (current)' };
+  return { conflict: false };
+});
+
 // File / folder pickers
 ipcMain.handle('browse-for-file', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
@@ -2333,6 +2491,7 @@ ipcMain.handle('get-engine-status', () => ({
   nutjsAvailable,
   macrosEnabled,
   activeProfile,
+  globalPauseToggleKey,
 }));
 
 // ── Help window ──────────────────────────────────────────────────────────
@@ -2626,6 +2785,46 @@ function unregisterOverlayHotkey() {
   console.log('[KeyForge] Overlay hotkey unregistered');
 }
 
+function registerPauseHotkey(comboStr) {
+  if (!koffiAvailable || !comboStr) return;
+  // Unregister previous registration first
+  if (pauseHotkeyId !== null) {
+    koffiUnregisterHotKey(_koffiHwnd, PAUSE_HOTKEY_ID);
+    pauseHotkeyId = null;
+  }
+  const parts = comboStr.split('+');
+  const keyPart = parts[parts.length - 1];
+  const modParts = parts.slice(0, -1);
+  const vk = VK_CODE_MAP[keyPart];
+  if (!vk) {
+    console.warn(`[KeyForge] Pause hotkey: no VK code for key "${keyPart}"`);
+    return;
+  }
+  let mods = MOD_NOREPEAT;
+  for (const m of modParts) {
+    switch (m) {
+      case 'Ctrl':  mods |= MOD_CONTROL; break;
+      case 'Alt':   mods |= MOD_ALT;     break;
+      case 'Shift': mods |= MOD_SHIFT;   break;
+      case 'Win':   mods |= MOD_WIN;     break;
+    }
+  }
+  const ok = koffiRegisterHotKey(_koffiHwnd, PAUSE_HOTKEY_ID, mods, vk);
+  if (ok) {
+    pauseHotkeyId = PAUSE_HOTKEY_ID;
+    console.log(`[KeyForge] Pause hotkey registered: ${comboStr} (id=${PAUSE_HOTKEY_ID})`);
+  } else {
+    console.warn(`[KeyForge] Pause hotkey registration failed for ${comboStr}`);
+  }
+}
+
+function unregisterPauseHotkey() {
+  if (!koffiAvailable || pauseHotkeyId === null) return;
+  koffiUnregisterHotKey(_koffiHwnd, PAUSE_HOTKEY_ID);
+  pauseHotkeyId = null;
+  console.log('[KeyForge] Pause hotkey unregistered');
+}
+
 // ─────────────────────────────────────────────
 // WINDOW
 // ─────────────────────────────────────────────
@@ -2662,6 +2861,10 @@ function createWindow() {
     mainWindow.hookWindowMessage(WM_HOTKEY, (wParam) => {
       if (!wParam || wParam.length < 4) return;
       const id = wParam.readUInt32LE(0);
+      if (id === PAUSE_HOTKEY_ID) {
+        applyMacrosPause(macrosEnabled); // toggle: pause if enabled, resume if disabled
+        return;
+      }
       if (id === OVERLAY_HOTKEY_ID) {
         toggleOverlay();
         return;
@@ -2683,6 +2886,9 @@ function createWindow() {
   }
 
   mainWindow.webContents.on('did-finish-load', () => {
+    // Ensure clean overlay state on startup
+    mainWindow.setOverlayIcon(null, '');
+
     // Load saved config and start listening
     const config = loadConfig();
     if (config?.assignments) {
@@ -2739,6 +2945,11 @@ function createWindow() {
       searchOverlayHotkey = migratedHotkey;
     }
     registerOverlayHotkey(searchOverlayHotkey);
+    // Register pause toggle hotkey if configured
+    if (cfg.globalPauseToggleKey) {
+      globalPauseToggleKey = cfg.globalPauseToggleKey;
+      registerPauseHotkey(globalPauseToggleKey);
+    }
     // Overlay window is created lazily on first use (showOverlay → createOverlayWindow)
     // to avoid a hidden renderer process consuming ~150MB at startup.
   });

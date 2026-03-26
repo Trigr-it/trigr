@@ -1,15 +1,26 @@
 import React from 'react';
 import './StatusBar.css';
 
-export default function StatusBar({ selectedKey, currentCombo, macrosEnabled, assignmentCount, notification, engineStatus, lastFired, appVersion }) {
+export default function StatusBar({ selectedKey, currentCombo, macrosEnabled, assignmentCount, notification, engineStatus, lastFired, appVersion, globalPauseToggleKey }) {
   const { uiohookAvailable, nutjsAvailable } = engineStatus || {};
+
+  function pauseHotkeyLabel(combo) {
+    if (!combo) return null;
+    return combo.split('+').map(p =>
+      p.startsWith('Key') ? p.slice(3) : p.startsWith('Digit') ? p.slice(5) : p
+    ).join('+');
+  }
 
   return (
     <div className="statusbar">
       <div className="statusbar-left">
         <span className={`status-indicator ${macrosEnabled ? 'active' : 'inactive'}`}>
           <span className="status-dot" />
-          {macrosEnabled ? 'Macros Active' : 'Macros Paused'}
+          {macrosEnabled
+            ? 'Macros Active'
+            : globalPauseToggleKey
+              ? `Paused — press ${pauseHotkeyLabel(globalPauseToggleKey)} to resume`
+              : 'Macros Paused'}
         </span>
         <span className="status-sep">·</span>
         <span className="status-info">{assignmentCount} assigned</span>

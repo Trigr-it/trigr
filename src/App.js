@@ -49,6 +49,7 @@ function App() {
   const [doubleTapWindow,            setDoubleTapWindow]            = useState(300);
   const [updateInfo,     setUpdateInfo]     = useState(null);   // { version, percent, ready, dismissed }
   const [appVersion,     setAppVersion]     = useState('');
+  const [globalPauseToggleKey, setGlobalPauseToggleKey] = useState(null);
 
 
   // Current modifier combo string e.g. "Ctrl+Alt"
@@ -103,6 +104,7 @@ function App() {
         // Always start on the Mapping view — do not restore last-used view/area
         setNumpadOpen(              config.numpadOpen               ?? false);
         setSearchOverlayHotkey(     config.searchOverlayHotkey      || 'Ctrl+Space');
+        setGlobalPauseToggleKey(    config.globalPauseToggleKey     ?? null);
         setOverlayShowAll(          config.overlayShowAll            ?? true);
         setOverlayCloseAfterFiring( config.overlayCloseAfterFiring   ?? true);
         setOverlayIncludeAutocorrect(config.overlayIncludeAutocorrect ?? false);
@@ -138,6 +140,7 @@ function App() {
       window.electronAPI.onEngineStatus((status) => {
         setEngineStatus(status);
         setMacrosEnabled(status.macrosEnabled);
+        if (status.globalPauseToggleKey !== undefined) setGlobalPauseToggleKey(status.globalPauseToggleKey);
       });
       window.electronAPI.onMacroFired((data) => {
         setLastFired(data);
@@ -734,6 +737,17 @@ function App() {
     window.electronAPI?.updateGlobalSettings(next);
   }, [globalInputMethod, keystrokeDelay, macroTriggerDelay, doubleTapWindow]);
 
+  // ── Global pause toggle ───────────────────────────────────
+  const handleSetPauseKey = useCallback(async (combo) => {
+    setGlobalPauseToggleKey(combo);
+    await window.electronAPI?.setPauseHotkey(combo);
+  }, []);
+
+  const handleClearPauseKey = useCallback(() => {
+    setGlobalPauseToggleKey(null);
+    window.electronAPI?.clearPauseHotkey();
+  }, []);
+
   // ── Search overlay settings ───────────────────────────────
   const handleUpdateSearchSettings = useCallback((patch) => {
     if (patch.searchOverlayHotkey      !== undefined) setSearchOverlayHotkey(patch.searchOverlayHotkey);
@@ -1140,6 +1154,9 @@ function App() {
             overlayCloseAfterFiring={overlayCloseAfterFiring}
             overlayIncludeAutocorrect={overlayIncludeAutocorrect}
             onUpdateSearchSettings={handleUpdateSearchSettings}
+            globalPauseToggleKey={globalPauseToggleKey}
+            onSetPauseKey={handleSetPauseKey}
+            onClearPauseKey={handleClearPauseKey}
           />
         ) : activeArea === 'mapping' ? (
           <MacroPanel
@@ -1174,6 +1191,7 @@ function App() {
         engineStatus={engineStatus}
         lastFired={lastFired}
         appVersion={appVersion}
+        globalPauseToggleKey={globalPauseToggleKey}
       />
     </div>
   );
