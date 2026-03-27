@@ -1,6 +1,6 @@
 {
   "name": "keyforge",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "description": "Visual Hotkey & Macro Manager",
   "author": "Trigr",
   "main": "electron/main.js",
@@ -95,7 +95,11 @@
       {
         "from": "node_modules/uiohook-napi",
         "to": "uiohook-napi",
-        "filter": ["**/*", "!prebuilds/darwin-*/**", "!prebuilds/linux-*/**"]
+        "filter": [
+          "**/*",
+          "!prebuilds/darwin-*/**",
+          "!prebuilds/linux-*/**"
+        ]
       }
     ],
     "win": {
