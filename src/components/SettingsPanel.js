@@ -94,7 +94,7 @@ export default function SettingsPanel({
             <button
               type="button"
               className="settings-action-btn settings-feedback-btn"
-              onClick={() => window.electronAPI?.openExternal('mailto:feedback@trigr.it?subject=Trigr%20Feedback')}
+              onClick={() => window.electronAPI?.openExternal('https://docs.google.com/forms/d/e/1FAIpQLScFygiarZG2MGV_JJSaLZux1ZNYC0w-ne5QSZ-HyTNQk5XEWA/viewform')}
             >
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
