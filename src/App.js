@@ -979,6 +979,7 @@ function App() {
                 <span className="update-banner__text">Trigr {updateInfo.version} ready — click to install and relaunch</span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"
+                  // CRITICAL — DO NOT MODIFY: must be fire-and-forget, no await, no state changes
                   onClick={() => { window.electronAPI?.installUpdate(); }}
                   type="button"
                 >Restart Now</button>

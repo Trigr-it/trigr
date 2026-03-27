@@ -3099,6 +3099,23 @@ ipcMain.handle('check-for-updates', async () => {
 
 // Downloads the installer for `version` directly from GitHub via HTTPS.
 // Sends download-progress and update-downloaded IPC events to the renderer.
+// ═══════════════════════════════════════════════════════════════════
+// CRITICAL — DO NOT MODIFY WITHOUT EXPLICIT INSTRUCTION
+// Auto-updater download and install flow — working as of v0.1.28
+//
+// DOWNLOAD: Direct HTTPS GET to GitHub releases URL — no blockmap,
+//   no differential, no electron-updater download logic.
+//   Streams to os.tmpdir() with progress events every 250ms.
+//
+// INSTALL: spawn(path, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'])
+//   detached + stdio:ignore + unref() then app.quit()
+//   Do NOT add await, try/catch, shell.openPath, setTimeout or any
+//   other code between spawn and app.quit().
+//   Do NOT switch to autoUpdater.quitAndInstall() — it does not work.
+//
+// Any change to these handlers risks breaking silent install and relaunch.
+// Last confirmed working: v0.1.28
+// ═══════════════════════════════════════════════════════════════════
 ipcMain.on('start-download', (event, args) => {
   const version = args?.version;
   console.log('[Updater] start-download received — args:', JSON.stringify(args), '| version:', version);
@@ -3180,6 +3197,23 @@ ipcMain.on('start-download', (event, args) => {
   download(url, 0);
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// CRITICAL — DO NOT MODIFY WITHOUT EXPLICIT INSTRUCTION
+// Auto-updater download and install flow — working as of v0.1.28
+//
+// DOWNLOAD: Direct HTTPS GET to GitHub releases URL — no blockmap,
+//   no differential, no electron-updater download logic.
+//   Streams to os.tmpdir() with progress events every 250ms.
+//
+// INSTALL: spawn(path, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'])
+//   detached + stdio:ignore + unref() then app.quit()
+//   Do NOT add await, try/catch, shell.openPath, setTimeout or any
+//   other code between spawn and app.quit().
+//   Do NOT switch to autoUpdater.quitAndInstall() — it does not work.
+//
+// Any change to these handlers risks breaking silent install and relaunch.
+// Last confirmed working: v0.1.28
+// ═══════════════════════════════════════════════════════════════════
 ipcMain.handle('install-update', async () => {
   if (!downloadedInstallerPath) {
     console.error('[Updater] No installer path — cannot install');
