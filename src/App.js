@@ -974,23 +974,12 @@ function App() {
         );
         return (
           <div className="update-banner">
-            {updateInfo.phase === 'installing' ? (
-              <>
-                <span className="update-banner__text">Installing update — Trigr will close shortly<span className="update-banner__dots" /></span>
-                <button className="update-banner__btn update-banner__btn--restart" type="button" disabled>Installing…</button>
-              </>
-            ) : updateInfo.phase === 'ready' ? (
+            {updateInfo.phase === 'ready' ? (
               <>
                 <span className="update-banner__text">Trigr {updateInfo.version} ready — click to install and relaunch</span>
                 <button
                   className="update-banner__btn update-banner__btn--restart"
-                  onClick={() => {
-                    setUpdateInfo(prev => ({ ...prev, phase: 'installing' }));
-                    // Fire-and-forget — app will quit so no response will arrive.
-                    // Do NOT await: an awaited ipcMain.handle call whose channel is
-                    // destroyed mid-flight hangs forever, keeping the app alive.
-                    window.electronAPI?.installUpdate();
-                  }}
+                  onClick={() => { window.electronAPI?.installUpdate(); }}
                   type="button"
                 >Restart Now</button>
                 <button

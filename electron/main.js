@@ -3056,10 +3056,7 @@ function initAutoUpdater() {
   console.log('[Updater] Current app version:', app.getVersion());
   console.log('[Updater] Feed config:', JSON.stringify(autoUpdater.getFeedURL?.() ?? '(using package.json publish config)'));
 
-  // Path to the downloaded installer, set by update-downloaded and consumed by install-update.
-  // Using info.downloadedFile directly avoids guessing the cache dir location
-  // (electron-updater uses AppData\Local, but app.getPath('appData') returns AppData\Roaming).
-  let cachedInstallerPath = null;
+  let installerPath = null;
 
   autoUpdater.logger = console;
   autoUpdater.autoDownload = false;              // never download without explicit user action
@@ -3100,8 +3097,8 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    cachedInstallerPath = info.downloadedFile ?? null;
-    console.log('[Updater] Update downloaded. installerPath stored as:', cachedInstallerPath);
+    installerPath = info.downloadedFile ?? null;
+    console.log('[Updater] Update downloaded. installerPath stored as:', installerPath);
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-downloaded');
     }
@@ -3140,61 +3137,20 @@ ipcMain.handle('check-for-updates', async () => {
 });
 
 ipcMain.handle('install-update', async () => {
-  console.log('[Updater] install-update IPC handler called');
-  const path = require('path');
-  const fs   = require('fs');
-
-  const installerPath = cachedInstallerPath;
-  console.log('[Updater] cachedInstallerPath:', installerPath);
-
-  if (!installerPath || !fs.existsSync(installerPath)) {
-    console.error('[Updater] Installer not found at cached path — cannot install:', installerPath);
-    // Fall back to electron-updater's own quit-and-install as a last resort
-    console.warn('[Updater] Falling back to autoUpdater.quitAndInstall()');
-    try { autoUpdater.quitAndInstall(true, true); } catch (e) { console.error('[Updater] quitAndInstall fallback failed:', e?.message); }
-    app.quit();
-    return;
+  if (!installerPath) {
+    console.error('[Updater] No installer path — cannot install');
+    return { success: false, error: 'No installer cached' };
   }
-
-  // ── Promote pending blockmap to root ─────────────────────
-  // electron-updater only updates root/current.blockmap when using quitAndInstall().
-  // Because we use a custom spawn, we do it here so the NEXT differential update
-  // has the correct baseline to diff against.
-  try {
-    const pendingDir      = path.dirname(installerPath);
-    const cacheDir        = path.dirname(pendingDir);
-    const pendingBlockmap = path.join(pendingDir, 'current.blockmap');
-    const rootBlockmap    = path.join(cacheDir,   'current.blockmap');
-    console.log('[Updater] Promotion — pendingDir:', pendingDir);
-    console.log('[Updater] Promotion — cacheDir:', cacheDir);
-    console.log('[Updater] Promotion — pendingBlockmap exists:', fs.existsSync(pendingBlockmap));
-    if (fs.existsSync(pendingBlockmap)) {
-      fs.copyFileSync(pendingBlockmap, rootBlockmap);
-      console.log('[Updater] Promoted pending/current.blockmap → root current.blockmap');
-    } else {
-      console.warn('[Updater] No pending blockmap found — skipping promotion');
-    }
-  } catch (e) {
-    console.error('[Updater] Blockmap promotion failed (non-fatal):', e?.message);
-  }
-
   try {
     const { spawn } = require('child_process');
-    console.log('[Updater] Spawning:', installerPath);
-    const child = spawn(installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
+    console.log('[Updater] Spawning installer:', installerPath);
+    spawn(installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
       detached: true,
-      stdio:    'ignore',
-    });
-    console.log('[Updater] spawn() returned — child.pid:', child.pid);
-    child.unref();
-    // /VERYSILENT suppresses the NSIS finish page so runAfterFinish is never exercised.
-    // Relaunch explicitly after a short delay to give the installer time to complete.
-    const exePath = app.getPath('exe');
-    console.log('[Updater] Will relaunch from:', exePath);
-    setTimeout(() => { shell.openPath(exePath); }, 3000);
+      stdio: 'ignore',
+    }).unref();
     app.quit();
   } catch (err) {
-    console.error('[Updater] spawn() threw — code:', err?.code, 'message:', err?.message ?? err);
+    console.error('[Updater] Spawn failed:', err?.message);
     app.quit();
   }
 });
