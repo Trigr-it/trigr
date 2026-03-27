@@ -187,6 +187,8 @@ app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');         // no sha
 
 let mainWindow;
 let overlayWindow         = null;
+let overlayReady          = false; // true once the renderer has sent 'overlay-ready'
+let _pendingOverlayData   = null;  // holds searchData between Ctrl+Space and overlay-ready signal
 let overlayHotkeyId       = null;  // numeric ID used with RegisterHotKey
 let fillInWindow          = null;
 let fillInWindowReady     = false; // true once the renderer has sent 'fill-in-ready'
@@ -2413,6 +2415,18 @@ ipcMain.on('update-global-settings', (_event, settings) => {
 });
 
 // ── Quick Search overlay IPC ────────────────────────────────────────
+ipcMain.on('overlay-ready', () => {
+  overlayReady = true;
+  if (_pendingOverlayData && overlayWindow && !overlayWindow.isDestroyed()) {
+    const data      = _pendingOverlayData;
+    _pendingOverlayData = null;
+    overlayWindow.show();
+    overlayWindow.focus();
+    overlayWindow.webContents.focus();
+    overlayWindow.webContents.send('overlay-search-data', data);
+  }
+});
+
 ipcMain.on('close-overlay', () => {
   hideOverlay();
   // Restore focus so the user is seamlessly returned to what they were doing
@@ -2765,7 +2779,7 @@ function createOverlayWindow() {
     if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide();
   });
 
-  overlayWindow.on('closed', () => { overlayWindow = null; });
+  overlayWindow.on('closed', () => { overlayWindow = null; overlayReady = false; _pendingOverlayData = null; });
 }
 
 function showOverlay() {
@@ -2786,23 +2800,32 @@ function showOverlay() {
     }
   }
 
-  overlayWindow.show();
-  overlayWindow.focus();
-  overlayWindow.webContents.focus();
-
-  // Send current data to overlay
   const cfg = loadConfig() || {};
-  overlayWindow.webContents.send('overlay-search-data', {
-    assignments: activeAssignments,
+  const searchData = {
+    assignments:      activeAssignments,
     activeProfile,
     globalInputMethod,
-    theme: cfg.theme || 'dark',
+    theme:            cfg.theme || 'dark',
     settings: {
       showAll:              cfg.overlayShowAll              ?? true,
       closeAfterFiring:     cfg.overlayCloseAfterFiring     ?? true,
       includeAutocorrect:   cfg.overlayIncludeAutocorrect   ?? false,
     },
-  });
+  };
+
+  function _doShowOverlay() {
+    overlayWindow.show();
+    overlayWindow.focus();
+    overlayWindow.webContents.focus();
+    overlayWindow.webContents.send('overlay-search-data', searchData);
+  }
+
+  if (overlayReady) {
+    _doShowOverlay();
+  } else {
+    // Renderer hasn't mounted yet — store data; overlay-ready IPC will trigger the show
+    _pendingOverlayData = searchData;
+  }
 }
 
 function hideOverlay() {
