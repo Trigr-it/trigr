@@ -271,10 +271,6 @@ export default function SearchOverlay() {
       // Focus the input each time the overlay opens (data arrives on every show)
       setTimeout(() => inputRef.current?.focus(), 0);
     });
-
-    // Signal to main process that the IPC listener is now registered and ready
-    // to receive overlay-search-data. Main process defers show/send until this fires.
-    window.electronAPI?.overlayReady?.();
   }, []);
 
   // ── Arrow-key handler on window ──

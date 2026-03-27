@@ -90,7 +90,6 @@ window.electronAPI = {
     ipcRenderer.removeAllListeners(channel),
 
   // Quick Search overlay
-  overlayReady:          ()          => ipcRenderer.send('overlay-ready'),
   closeOverlay:          ()          => ipcRenderer.send('close-overlay'),
   resizeOverlay:         (height)    => ipcRenderer.send('overlay-resize', { height }),
   executeSearchResult:   (result)    => ipcRenderer.send('execute-search-result', result),
