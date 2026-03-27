@@ -3051,84 +3051,44 @@ function createWindow() {
 // ─────────────────────────────────────────────
 // AUTO-UPDATER
 // ─────────────────────────────────────────────
+// Path to the installer downloaded via HTTPS — set by start-download, read by install-update.
+let downloadedInstallerPath = null;
+
 function initAutoUpdater() {
-  console.log('[Updater] initAutoUpdater() called — registering event handlers');
-  console.log('[Updater] Current app version:', app.getVersion());
-  console.log('[Updater] Feed config:', JSON.stringify(autoUpdater.getFeedURL?.() ?? '(using package.json publish config)'));
+  console.log('[Updater] initAutoUpdater() — version:', app.getVersion());
 
-  let installerPath = null;
-
-  autoUpdater.logger = console;
-  autoUpdater.autoDownload = false;              // never download without explicit user action
-  autoUpdater.autoInstallOnAppQuit = true;       // apply cached update when app quits normally
-  autoUpdater.allowDowngrade = false;            // never roll back to an older version
-  autoUpdater.disableWebInstaller = true;        // use the full NSIS installer, not the web stub
-  // Disable signature verification — build is not yet code-signed (Microsoft Trusted Signing pending).
-  // Remove this line once signing is configured and the certificate is trusted.
+  // Use electron-updater for version checking only — no downloading.
+  autoUpdater.logger          = console;
+  autoUpdater.autoDownload    = false;
+  autoUpdater.allowDowngrade  = false;
+  autoUpdater.disableWebInstaller = true;
   autoUpdater.verifyUpdateCodeSignature = () => Promise.resolve(undefined);
 
-  autoUpdater.on('checking-for-update', () => {
-    console.log('[Updater] Checking for update...');
-  });
-
   autoUpdater.on('update-available', (info) => {
-    console.log('[Updater] Update available:', JSON.stringify(info));
-    // Do NOT send downloadSize — info.files contains the full installer size, not the differential
-    // size. The real download size comes from download-progress events once the transfer starts.
+    console.log('[Updater] Update available:', info.version);
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-available', { version: info.version });
     }
   });
 
-  autoUpdater.on('update-not-available', (info) => {
-    console.log('[Updater] No update available. Current version is latest:', JSON.stringify(info));
-  });
-
-  autoUpdater.on('download-progress', (progress) => {
-    console.log(`[Updater] Download progress: ${progress.percent?.toFixed(1)}% (${progress.transferred}/${progress.total} bytes) @ ${Math.round((progress.bytesPerSecond || 0) / 1024)} KB/s`);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('download-progress', {
-        percent:        progress.percent,
-        transferred:    progress.transferred,
-        total:          progress.total,
-        bytesPerSecond: progress.bytesPerSecond,
-      });
-    }
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    installerPath = info.downloadedFile ?? null;
-    console.log('[Updater] Update downloaded. installerPath stored as:', installerPath);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-downloaded');
-    }
+  autoUpdater.on('update-not-available', () => {
+    console.log('[Updater] Already on latest version');
   });
 
   autoUpdater.on('error', (err) => {
-    console.error('[Updater] Error:', err?.message ?? err);
-    console.error('[Updater] Full error:', err);
+    console.error('[Updater] Version check error:', err?.message ?? err);
   });
 
-  console.log('[Updater] Scheduling checkForUpdatesAndNotify in 3 s...');
   setTimeout(() => {
-    console.log('[Updater] Calling checkForUpdatesAndNotify()...');
-    autoUpdater.checkForUpdatesAndNotify().then((result) => {
-      console.log('[Updater] checkForUpdatesAndNotify result:', JSON.stringify(result));
-    }).catch((err) => {
-      console.error('[Updater] checkForUpdatesAndNotify failed:', err?.message ?? err);
-      console.error('[Updater] NOTE: If this is a private GitHub repo, a GH_TOKEN env var is required for update checks.');
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('[Updater] checkForUpdates failed:', err?.message ?? err);
     });
   }, 3000);
 }
 
 ipcMain.handle('check-for-updates', async () => {
-  console.log('[Updater] Manual check-for-updates triggered via IPC');
-  console.log('[Updater] isDev:', isDev);
-  console.log('[Updater] app.isPackaged:', app.isPackaged);
-  console.log('[Updater] Current version:', app.getVersion());
   try {
     const result = await autoUpdater.checkForUpdates();
-    console.log('[Updater] Manual check result:', JSON.stringify(result));
     return { success: true, result: result ? { version: result.updateInfo?.version } : null };
   } catch (err) {
     console.error('[Updater] Manual check error:', err?.message ?? err);
@@ -3136,15 +3096,90 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
+// Downloads the installer for `version` directly from GitHub via HTTPS.
+// Sends download-progress and update-downloaded IPC events to the renderer.
+ipcMain.on('start-download', (event, { version }) => {
+  const https = require('https');
+  const fs    = require('fs');
+  const os    = require('os');
+  const path  = require('path');
+
+  const url  = `https://github.com/Trigr-it/trigr/releases/download/v${version}/Trigr-Setup-${version}.exe`;
+  const dest = path.join(os.tmpdir(), `Trigr-Setup-${version}.exe`);
+  console.log('[Updater] Downloading', url, '→', dest);
+
+  function download(downloadUrl, redirectCount) {
+    if (redirectCount > 5) {
+      console.error('[Updater] Too many redirects');
+      return;
+    }
+    https.get(downloadUrl, (res) => {
+      if (res.statusCode === 302 || res.statusCode === 301) {
+        res.resume();
+        download(res.headers.location, redirectCount + 1);
+        return;
+      }
+      if (res.statusCode !== 200) {
+        console.error('[Updater] Download failed — HTTP', res.statusCode);
+        return;
+      }
+
+      const total       = parseInt(res.headers['content-length'] || '0', 10);
+      let   transferred = 0;
+      let   lastSent    = 0;
+      const startTime   = Date.now();
+      const file        = fs.createWriteStream(dest);
+
+      res.on('data', (chunk) => {
+        transferred += chunk.length;
+        const now = Date.now();
+        // Throttle progress events to once per 250 ms
+        if (now - lastSent >= 250 || transferred === total) {
+          lastSent = now;
+          const elapsed        = (now - startTime) / 1000 || 0.001;
+          const bytesPerSecond = transferred / elapsed;
+          const percent        = total ? (transferred / total) * 100 : 0;
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('download-progress', {
+              percent, transferred, total, bytesPerSecond,
+            });
+          }
+        }
+      });
+
+      res.pipe(file);
+
+      file.on('finish', () => {
+        file.close(() => {
+          console.log('[Updater] Download complete:', dest);
+          downloadedInstallerPath = dest;
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('update-downloaded');
+          }
+        });
+      });
+
+      file.on('error', (err) => {
+        console.error('[Updater] File write error:', err.message);
+        fs.unlink(dest, () => {});
+      });
+    }).on('error', (err) => {
+      console.error('[Updater] HTTPS error:', err.message);
+    });
+  }
+
+  download(url, 0);
+});
+
 ipcMain.handle('install-update', async () => {
-  if (!installerPath) {
+  if (!downloadedInstallerPath) {
     console.error('[Updater] No installer path — cannot install');
     return { success: false, error: 'No installer cached' };
   }
   try {
     const { spawn } = require('child_process');
-    console.log('[Updater] Spawning installer:', installerPath);
-    spawn(installerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
+    console.log('[Updater] Spawning installer:', downloadedInstallerPath);
+    spawn(downloadedInstallerPath, ['/VERYSILENT', '/RESTARTAPPLICATIONS', '--updated'], {
       detached: true,
       stdio: 'ignore',
     }).unref();
@@ -3153,13 +3188,6 @@ ipcMain.handle('install-update', async () => {
     console.error('[Updater] Spawn failed:', err?.message);
     app.quit();
   }
-});
-
-ipcMain.on('start-download', () => {
-  console.log('[Updater] User initiated download');
-  autoUpdater.downloadUpdate().catch((err) => {
-    console.error('[Updater] downloadUpdate failed:', err?.message ?? err);
-  });
 });
 
 app.whenReady().then(() => {

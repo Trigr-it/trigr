@@ -1012,7 +1012,7 @@ function App() {
                   className="update-banner__btn update-banner__btn--restart"
                   onClick={() => {
                     setUpdateInfo(prev => ({ ...prev, phase: 'downloading' }));
-                    window.electronAPI?.startDownload();
+                    window.electronAPI?.startDownload(updateInfo.version);
                   }}
                   type="button"
                 >Download &amp; Install</button>
