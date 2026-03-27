@@ -3065,7 +3065,8 @@ function initAutoUpdater() {
   autoUpdater.verifyUpdateCodeSignature = () => Promise.resolve(undefined);
 
   autoUpdater.on('update-available', (info) => {
-    console.log('[Updater] Update available:', info.version);
+    console.log('[Updater] update-available full info:', JSON.stringify(info));
+    console.log('[Updater] info.version:', info.version);
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-available', { version: info.version });
     }
@@ -3098,7 +3099,15 @@ ipcMain.handle('check-for-updates', async () => {
 
 // Downloads the installer for `version` directly from GitHub via HTTPS.
 // Sends download-progress and update-downloaded IPC events to the renderer.
-ipcMain.on('start-download', (event, { version }) => {
+ipcMain.on('start-download', (event, args) => {
+  const version = args?.version;
+  console.log('[Updater] start-download received — args:', JSON.stringify(args), '| version:', version);
+
+  if (!version) {
+    console.error('[Updater] start-download called with no version — aborting');
+    return;
+  }
+
   const https = require('https');
   const fs    = require('fs');
   const os    = require('os');

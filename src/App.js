@@ -1011,6 +1011,7 @@ function App() {
                 <button
                   className="update-banner__btn update-banner__btn--restart"
                   onClick={() => {
+                    console.log('[UpdateBanner] Download clicked — updateInfo.version:', updateInfo?.version, '| full updateInfo:', JSON.stringify(updateInfo));
                     setUpdateInfo(prev => ({ ...prev, phase: 'downloading' }));
                     window.electronAPI?.startDownload(updateInfo.version);
                   }}
