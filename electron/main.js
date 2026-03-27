@@ -3187,6 +3187,11 @@ ipcMain.handle('install-update', async () => {
     });
     console.log('[Updater] spawn() returned — child.pid:', child.pid);
     child.unref();
+    // /VERYSILENT suppresses the NSIS finish page so runAfterFinish is never exercised.
+    // Relaunch explicitly after a short delay to give the installer time to complete.
+    const exePath = app.getPath('exe');
+    console.log('[Updater] Will relaunch from:', exePath);
+    setTimeout(() => { shell.openPath(exePath); }, 3000);
     app.quit();
   } catch (err) {
     console.error('[Updater] spawn() threw — code:', err?.code, 'message:', err?.message ?? err);

@@ -876,7 +876,7 @@ function App() {
   })();
 
   // Auto-updater listeners
-  // phase: 'available' | 'downloading' | 'ready'
+  // phase: 'available' | 'downloading' | 'ready' | 'dismissed'
   useEffect(() => {
     if (!window.electronAPI) return;
 
