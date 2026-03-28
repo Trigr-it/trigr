@@ -9,830 +9,377 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --gold: #e8a020;
-    --gold-light: #f0b942;
-    --gold-dark: #c8860a;
-    --cyan: #22D3EE;
-    --cyan-dim: #0891B2;
-    --bg: #080B14;
-    --bg-2: #0D1120;
-    --bg-3: #111827;
-    --bg-4: #1A2035;
-    --border: rgba(232,160,32,0.15);
-    --border-subtle: rgba(255,255,255,0.06);
-    --text: #F1F5F9;
-    --text-muted: #94A3B8;
-    --text-dim: #475569;
-    --radius: 12px;
-    --radius-lg: 20px;
-  }
-
-  html { scroll-behavior: smooth; }
-
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    overflow-x: hidden;
-  }
-
-  /* ── NOISE TEXTURE OVERLAY ── */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.4;
-  }
-
-  /* ── GRID BACKGROUND ── */
-  .grid-bg {
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(232,160,32,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(232,160,32,0.04) 1px, transparent 1px);
-    background-size: 48px 48px;
-    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 70%);
-  }
-
-  /* ── NAV ── */
-  nav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    padding: 0 40px;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(8,11,20,0.8);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .nav-logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-  }
-
-  .logo-mark {
-    width: 32px;
-    height: 32px;
-    background: #e8a020;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 16px;
-    color: white;
-    letter-spacing: -0.5px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .logo-mark::after {
-    display: none;
-  }
-
-  .nav-wordmark {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 18px;
-    color: var(--text);
-    letter-spacing: -0.3px;
-  }
-
-  .nav-links {
-    display: flex;
-    align-items: center;
-    gap: 32px;
-  }
-
-  .nav-links a {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-muted);
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-
-  .nav-links a:hover { color: var(--text); }
-
-  .nav-cta {
-    background: var(--gold) !important;
-    color: #13131a !important;
-    padding: 8px 20px;
-    border-radius: 8px;
-    font-weight: 500 !important;
-    transition: background 0.2s !important;
-  }
-
-  .nav-cta:hover { background: var(--gold-dark) !important; }
-
-  /* ── HERO ── */
-  .hero {
-    position: relative;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 120px 40px 80px;
-    overflow: hidden;
-  }
-
-  .hero-glow {
-    position: absolute;
-    top: -100px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 800px;
-    height: 600px;
-    background: radial-gradient(ellipse at center, rgba(232,160,32,0.15) 0%, rgba(34,211,238,0.05) 40%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(232,160,32,0.1);
-    border: 1px solid rgba(232,160,32,0.3);
-    border-radius: 100px;
-    padding: 6px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #c8860a;
-    margin-bottom: 32px;
-    animation: fadeInUp 0.6s ease both;
-  }
-
-  .hero-badge-dot {
-    width: 6px;
-    height: 6px;
-    background: var(--cyan);
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
-  }
-
-  .hero h1 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: clamp(48px, 7vw, 88px);
-    line-height: 1.0;
-    letter-spacing: -2px;
-    color: var(--text);
-    margin-bottom: 24px;
-    animation: fadeInUp 0.6s 0.1s ease both;
-  }
-
-  .hero h1 em {
-    font-style: normal;
-    background: linear-gradient(135deg, var(--gold-light), var(--cyan));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .hero-sub {
-    font-size: clamp(16px, 2vw, 20px);
-    color: var(--text-muted);
-    max-width: 560px;
-    margin: 0 auto 48px;
-    font-weight: 300;
-    line-height: 1.7;
-    animation: fadeInUp 0.6s 0.2s ease both;
-  }
-
-  .hero-actions {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    justify-content: center;
-    animation: fadeInUp 0.6s 0.3s ease both;
-  }
-
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--gold);
-    color: #13131a;
-    text-decoration: none;
-    padding: 14px 28px;
-    border-radius: var(--radius);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    transition: all 0.2s;
-    box-shadow: 0 0 0 0 rgba(232,160,32,0.4);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .btn-primary::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
-    pointer-events: none;
-  }
-
-  .btn-primary:hover {
-    background: var(--gold-dark);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 32px rgba(232,160,32,0.35);
-  }
-
-  .btn-secondary {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: transparent;
-    color: var(--text-muted);
-    text-decoration: none;
-    padding: 14px 24px;
-    border-radius: var(--radius);
-    font-size: 15px;
-    font-weight: 500;
-    border: 1px solid var(--border-subtle);
-    transition: all 0.2s;
-  }
-
-  .btn-secondary:hover {
-    color: var(--text);
-    border-color: rgba(255,255,255,0.15);
-    background: rgba(255,255,255,0.04);
-  }
-
-  .hero-meta {
-    margin-top: 20px;
-    font-size: 13px;
-    color: var(--text-dim);
-    animation: fadeInUp 0.6s 0.4s ease both;
-  }
-
-  /* ── APP PREVIEW ── */
-  .app-preview {
-    position: relative;
-    margin-top: 80px;
-    width: 100%;
-    max-width: 900px;
-    animation: fadeInUp 0.8s 0.5s ease both;
-  }
-
-  .preview-frame {
-    background: var(--bg-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.04),
-      0 32px 80px rgba(0,0,0,0.6),
-      0 0 100px rgba(232,160,32,0.08);
-  }
-
-  .preview-titlebar {
-    background: var(--bg-2);
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .dot { width: 10px; height: 10px; border-radius: 50%; }
-  .dot-r { background: #FF5F57; }
-  .dot-y { background: #FFBD2E; }
-  .dot-g { background: #28CA41; }
-
-  .preview-title {
-    flex: 1;
-    text-align: center;
-    font-size: 12px;
-    color: var(--text-dim);
-    font-weight: 500;
-    margin-left: -34px;
-  }
-
-  .preview-body {
-    padding: 40px;
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 24px;
-    min-height: 280px;
-  }
-
-  .preview-sidebar {
-    background: var(--bg-2);
-    border-radius: 10px;
-    padding: 16px;
-    border: 1px solid var(--border-subtle);
-  }
-
-  .preview-sidebar-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 12px;
-  }
-
-  .preview-item {
-    padding: 8px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .preview-item.active {
-    background: rgba(232,160,32,0.15);
-    color: #c8860a;
-  }
-
-  .preview-item-key {
-    background: var(--bg-4);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-size: 10px;
-    font-family: monospace;
-    color: var(--text-dim);
-    margin-left: auto;
-  }
-
-  .preview-main {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .preview-keyboard {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 4px;
-  }
-
-  .key {
-    background: var(--bg-4);
-    border: 1px solid var(--border-subtle);
-    border-radius: 5px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    color: var(--text-dim);
-    transition: all 0.2s;
-  }
-
-  .key.active {
-    background: rgba(232,160,32,0.2);
-    border-color: rgba(232,160,32,0.4);
-    color: #c8860a;
-  }
-
-  .key.assigned {
-    background: rgba(34,211,238,0.1);
-    border-color: rgba(34,211,238,0.3);
-    color: var(--cyan);
-  }
-
-  .key.wide { grid-column: span 2; }
-  .key.wider { grid-column: span 3; }
-
-  .preview-action-panel {
-    background: var(--bg-2);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 16px;
-    flex: 1;
-  }
-
-  .preview-action-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 10px;
-  }
-
-  .preview-type-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(232,160,32,0.15);
-    border: 1px solid rgba(232,160,32,0.3);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 11px;
-    color: #c8860a;
-    margin-bottom: 8px;
-  }
-
-  .preview-text-field {
-    background: var(--bg-4);
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: var(--text-muted);
-    font-family: monospace;
-  }
-
-  /* ── SECTION BASE ── */
-  section {
-    position: relative;
-    padding: 100px 40px;
-    max-width: 1100px;
-    margin: 0 auto;
-  }
-
-  .section-label {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: #c8860a;
-    margin-bottom: 16px;
-  }
-
-  .section-title {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: clamp(32px, 4vw, 48px);
-    letter-spacing: -1px;
-    line-height: 1.1;
-    color: var(--text);
-    margin-bottom: 16px;
-  }
-
-  .section-sub {
-    font-size: 17px;
-    color: var(--text-muted);
-    font-weight: 300;
-    max-width: 520px;
-    line-height: 1.7;
-  }
-
-  /* ── FEATURES ── */
-  .features-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-top: 64px;
-  }
-
-  .feature-card {
-    background: var(--bg-2);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 32px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s;
-  }
-
-  .feature-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(232,160,32,0.4), transparent);
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-
-  .feature-card:hover {
-    border-color: var(--border);
-    transform: translateY(-2px);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.3);
-  }
-
-  .feature-card:hover::before { opacity: 1; }
-
-  .feature-icon {
-    width: 44px;
-    height: 44px;
-    background: rgba(232,160,32,0.1);
-    border: 1px solid rgba(232,160,32,0.2);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    margin-bottom: 20px;
-  }
-
-  .feature-card h3 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    font-size: 17px;
-    color: var(--text);
-    margin-bottom: 10px;
-    letter-spacing: -0.3px;
-  }
-
-  .feature-card p {
-    font-size: 14px;
-    color: var(--text-muted);
-    line-height: 1.65;
-    font-weight: 300;
-  }
-
-  .feature-card .feature-tag {
-    display: inline-block;
-    margin-top: 16px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--cyan);
-    letter-spacing: 0.3px;
-  }
-
-  /* ── HOW IT WORKS ── */
-  .how-section {
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 40px;
-    margin-top: 64px;
-    position: relative;
-  }
-
-  .steps::before {
-    content: '';
-    position: absolute;
-    top: 28px;
-    left: calc(16.66% + 28px);
-    right: calc(16.66% + 28px);
-    height: 1px;
-    background: linear-gradient(90deg, var(--gold), var(--cyan));
-    opacity: 0.3;
-  }
-
-  .step {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-
-  .step-num {
-    width: 56px;
-    height: 56px;
-    background: var(--bg-3);
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 20px;
-    color: #c8860a;
-    position: relative;
-    z-index: 1;
-  }
-
-  .step h3 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    font-size: 18px;
-    color: var(--text);
-    letter-spacing: -0.3px;
-  }
-
-  .step p {
-    font-size: 14px;
-    color: var(--text-muted);
-    line-height: 1.65;
-    font-weight: 300;
-  }
-
-  /* ── GUIDE CTA ── */
-  .guide-cta {
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .guide-card {
-    background: linear-gradient(135deg, rgba(232,160,32,0.08) 0%, rgba(34,211,238,0.05) 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 64px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 40px;
-    align-items: center;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .guide-card::before {
-    content: '';
-    position: absolute;
-    top: -60px;
-    right: -60px;
-    width: 240px;
-    height: 240px;
-    background: radial-gradient(circle, rgba(232,160,32,0.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .guide-card h2 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 32px;
-    letter-spacing: -0.8px;
-    color: var(--text);
-    margin-bottom: 12px;
-  }
-
-  .guide-card p {
-    font-size: 16px; color: #e8a020;
-    color: var(--text-muted);
-    font-weight: 300;
-    line-height: 1.7;
-    max-width: 480px;
-  }
-
-  .guide-features {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 20px;
-  }
-
-  .guide-tag {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    padding: 4px 12px;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  /* ── DOWNLOAD SECTION ── */
-  .download-section {
-    border-top: 1px solid var(--border-subtle);
-    text-align: center;
-  }
-
-  .download-card {
-    background: var(--bg-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 80px 40px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .download-glow {
-    position: absolute;
-    bottom: -80px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 600px;
-    height: 300px;
-    background: radial-gradient(ellipse at center, rgba(232,160,32,0.12) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .download-card h2 {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: clamp(36px, 5vw, 56px);
-    letter-spacing: -1.5px;
-    color: var(--text);
-    margin-bottom: 16px;
-  }
-
-  .download-card p {
-    font-size: 17px;
-    color: var(--text-muted);
-    font-weight: 300;
-    margin-bottom: 40px;
-    max-width: 440px;
-    margin-left: auto;
-    margin-right: auto;
-    line-height: 1.7;
-  }
-
-  .download-meta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 24px;
-    margin-top: 24px;
-    font-size: 13px;
-    color: var(--text-dim);
-  }
-
-  .download-meta-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .download-meta-item svg {
-    width: 14px;
-    height: 14px;
-    opacity: 0.5;
-  }
-
-  /* ── FOOTER ── */
-  footer {
-    border-top: 1px solid var(--border-subtle);
-    padding: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    max-width: 1100px;
-    margin: 0 auto;
-  }
-
-  .footer-logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-  }
-
-  .footer-wordmark {
-    font-family: 'Syne', sans-serif;
-    font-weight: 700;
-    font-size: 16px; color: #e8a020;
-    color: var(--text-muted);
-  }
-
-  .footer-links {
-    display: flex;
-    gap: 28px;
-  }
-
-  .footer-links a {
-    font-size: 13px;
-    color: var(--text-dim);
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-
-  .footer-links a:hover { color: var(--text-muted); }
-
-  .footer-copy {
-    font-size: 13px;
-    color: var(--text-dim);
-  }
-
-  /* ── ANIMATIONS ── */
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 768px) {
-    nav { padding: 0 20px; }
-    .nav-links { display: none; }
-    section { padding: 60px 20px; }
-    .features-grid { grid-template-columns: 1fr; }
-    .steps { grid-template-columns: 1fr; }
-    .steps::before { display: none; }
-    .guide-card { grid-template-columns: 1fr; padding: 40px 24px; }
-    footer { flex-direction: column; gap: 20px; text-align: center; }
-    .preview-body { grid-template-columns: 1fr; }
-    .preview-sidebar { display: none; }
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --gold: #e8a020;
+  --gold-light: #f0b942;
+  --gold-dark: #c8860a;
+  --bg: #080B14;
+  --bg-2: #0D1120;
+  --bg-3: #111827;
+  --bg-4: #1A2035;
+  --border: rgba(232,160,32,0.15);
+  --border-subtle: rgba(255,255,255,0.06);
+  --text: #F1F5F9;
+  --text-muted: #94A3B8;
+  --text-dim: #475569;
+  --radius: 12px;
+  --radius-lg: 20px;
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.4;
+}
+
+.grid-bg {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(232,160,32,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(232,160,32,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 70%);
+}
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 0 40px; height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(8,11,20,0.85); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-mark {
+  width: 32px; height: 32px; background: #e8a020; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; color: white;
+}
+.nav-wordmark { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; color: var(--text); letter-spacing: -0.3px; }
+.nav-links { display: flex; align-items: center; gap: 32px; }
+.nav-links a { font-size: 14px; font-weight: 500; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+.nav-links a:hover { color: var(--text); }
+.nav-cta { background: var(--gold) !important; color: #13131a !important; padding: 8px 20px; border-radius: 8px; font-weight: 500 !important; transition: background 0.2s !important; }
+.nav-cta:hover { background: var(--gold-dark) !important; }
+
+/* HERO */
+.hero-wrap { position: relative; overflow: hidden; }
+.hero-inner {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 140px 40px 80px;
+  text-align: center;
+}
+.hero-glow {
+  position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+  width: 800px; height: 600px;
+  background: radial-gradient(ellipse at center, rgba(232,160,32,0.12) 0%, rgba(232,160,32,0.04) 40%, transparent 70%);
+  pointer-events: none;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(232,160,32,0.1); border: 1px solid rgba(232,160,32,0.3);
+  border-radius: 100px; padding: 6px 16px;
+  font-size: 13px; font-weight: 500; color: #f0b942;
+  margin-bottom: 32px;
+  animation: fadeInUp 0.6s ease both;
+}
+.hero-badge-dot { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+.hero-h1 {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(52px, 7.5vw, 92px);
+  line-height: 1.0; letter-spacing: -2.5px;
+  color: var(--text); margin-bottom: 24px;
+  animation: fadeInUp 0.6s 0.1s ease both;
+}
+.hero-h1 em {
+  font-style: normal;
+  background: linear-gradient(135deg, #f0b942, #e8a020);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.hero-sub {
+  font-size: clamp(16px, 2vw, 19px); color: var(--text-muted);
+  max-width: 520px; margin: 0 auto 48px;
+  font-weight: 300; line-height: 1.7;
+  animation: fadeInUp 0.6s 0.2s ease both;
+}
+.hero-actions {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center;
+  animation: fadeInUp 0.6s 0.3s ease both;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--gold); color: #13131a;
+  text-decoration: none; padding: 14px 28px; border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+  transition: all 0.2s; position: relative; overflow: hidden;
+}
+.btn-primary:hover { background: var(--gold-dark); transform: translateY(-1px); box-shadow: 0 8px 32px rgba(232,160,32,0.3); }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; color: var(--text-muted);
+  text-decoration: none; padding: 14px 24px; border-radius: var(--radius);
+  font-size: 15px; font-weight: 500; border: 1px solid var(--border-subtle);
+  transition: all 0.2s;
+}
+.btn-secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); }
+.hero-meta { margin-top: 20px; font-size: 13px; color: var(--text-dim); animation: fadeInUp 0.6s 0.4s ease both; }
+
+/* ── INTERACTIVE APP MOCKUP ── */
+.mockup-wrap {
+  margin-top: 72px; width: 100%; max-width: 960px;
+  animation: fadeInUp 0.8s 0.5s ease both;
+}
+.mockup-shell {
+  background: #0d0d11;
+  border: 1px solid rgba(232,160,32,0.2);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 40px 100px rgba(0,0,0,0.7), 0 0 80px rgba(232,160,32,0.06);
+}
+
+/* titlebar */
+.m-titlebar {
+  background: #0a0a0f;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 0 16px;
+  height: 40px;
+  display: flex; align-items: center; gap: 0;
+  user-select: none;
+}
+.m-tb-dots { display: flex; gap: 6px; margin-right: 16px; }
+.m-dot { width: 10px; height: 10px; border-radius: 50%; }
+.m-dot-r { background: #FF5F57; } .m-dot-y { background: #FFBD2E; } .m-dot-g { background: #28CA41; }
+.m-tb-logo { display: flex; align-items: center; gap: 7px; margin-right: 20px; }
+.m-tb-logo-mark { width: 18px; height: 18px; background: #e8a020; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 10px; color: white; flex-shrink: 0; }
+.m-tb-wordmark { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px; color: #f0ede8; }
+.m-tb-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 12px; }
+.m-tabs { display: flex; gap: 2px; }
+.m-tab {
+  padding: 0 14px; height: 40px; display: flex; align-items: center;
+  font-size: 12px; font-weight: 500; color: #4a4860; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.m-tab:hover { color: #8a8799; }
+.m-tab.active { color: #f0ede8; border-bottom-color: #e8a020; }
+.m-tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.m-tb-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; color: #4a4860; font-size: 12px; }
+.m-tb-btn:hover { background: rgba(255,255,255,0.06); color: #8a8799; }
+
+/* main area */
+.m-body { display: flex; height: 480px; }
+
+/* sidebar */
+.m-sidebar {
+  width: 200px; flex-shrink: 0;
+  background: #0d0d11;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column;
+}
+.m-sidebar-header {
+  padding: 12px 14px 8px;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: #4a4860;
+}
+.m-mod-bar {
+  display: flex; gap: 4px; padding: 0 10px 10px;
+}
+.m-mod {
+  flex: 1; height: 26px; border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: #13131a; font-size: 10px; font-weight: 600;
+  color: #4a4860; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.m-mod:hover { border-color: rgba(232,160,32,0.3); color: #8a8799; }
+.m-mod.active { background: rgba(232,160,32,0.12); border-color: rgba(232,160,32,0.4); color: #e8a020; }
+.m-assignments { flex: 1; overflow-y: auto; padding: 4px 8px; }
+.m-assign {
+  padding: 8px 8px; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: #8a8799; margin-bottom: 2px;
+  transition: all 0.15s; border: 1px solid transparent;
+}
+.m-assign:hover { background: rgba(255,255,255,0.04); color: #f0ede8; }
+.m-assign.active { background: rgba(232,160,32,0.1); border-color: rgba(232,160,32,0.2); color: #f0ede8; }
+.m-assign-key {
+  background: #1a1a24; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px; padding: 1px 6px; font-size: 10px; color: #4a4860; font-family: monospace;
+}
+.m-assign.active .m-assign-key { background: rgba(232,160,32,0.15); border-color: rgba(232,160,32,0.3); color: #e8a020; }
+
+/* keyboard area */
+.m-keyboard-area {
+  flex: 1; background: #13131a;
+  display: flex; flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  padding: 16px;
+  overflow: hidden;
+}
+.m-kb-rows { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.m-kb-row { display: flex; gap: 4px; }
+.m-key {
+  height: 36px; min-width: 36px; border-radius: 5px;
+  background: #16161f; border: 1px solid #252535;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; color: #4a4860;
+  cursor: pointer; transition: all 0.15s; user-select: none;
+  padding: 0 8px; white-space: nowrap;
+}
+.m-key:hover { background: #1e1e2c; border-color: rgba(232,160,32,0.2); color: #8a8799; }
+.m-key.assigned { background: #1a1a10; border-color: rgba(232,160,32,0.4); color: #e8a020; }
+.m-key.selected { background: #1f1a08; border-color: #e8a020; color: #e8a020; box-shadow: 0 0 8px rgba(232,160,32,0.2); }
+.m-key.mod-key { background: #1a1a24; color: #6060a0; }
+.m-key.mod-key.active { background: rgba(232,160,32,0.12); border-color: rgba(232,160,32,0.4); color: #e8a020; }
+.m-key.wide { min-width: 58px; }
+.m-key.wider { min-width: 80px; }
+.m-key.widest { min-width: 120px; }
+
+/* action panel */
+.m-panel {
+  width: 240px; flex-shrink: 0;
+  background: #0d0d11;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.m-panel-header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+  text-transform: uppercase; color: #4a4860;
+}
+.m-panel-content { flex: 1; padding: 14px 16px; overflow-y: auto; }
+.m-type-tabs { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+.m-type-tab {
+  padding: 5px 10px; border-radius: 5px; font-size: 11px; font-weight: 500;
+  background: #13131a; border: 1px solid rgba(255,255,255,0.08);
+  color: #4a4860; cursor: pointer; transition: all 0.15s;
+}
+.m-type-tab:hover { color: #8a8799; border-color: rgba(255,255,255,0.15); }
+.m-type-tab.active { background: rgba(232,160,32,0.12); border-color: rgba(232,160,32,0.35); color: #e8a020; }
+.m-field-label { font-size: 10px; color: #4a4860; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+.m-textarea {
+  width: 100%; background: #13131a; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 10px 12px;
+  font-size: 12px; color: #f0ede8; font-family: 'DM Sans', sans-serif;
+  resize: none; outline: none; transition: border-color 0.15s; line-height: 1.5;
+}
+.m-textarea:focus { border-color: rgba(232,160,32,0.4); }
+.m-input {
+  width: 100%; background: #13131a; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #f0ede8;
+  font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; margin-bottom: 10px;
+}
+.m-input:focus { border-color: rgba(232,160,32,0.4); }
+.m-input::placeholder { color: #4a4860; }
+.m-panel-footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; gap: 8px;
+}
+.m-btn-save {
+  flex: 1; padding: 8px; border-radius: 6px;
+  background: var(--gold); border: none; color: #13131a;
+  font-size: 12px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; transition: all 0.15s;
+}
+.m-btn-save:hover { background: var(--gold-dark); }
+.m-btn-cancel {
+  padding: 8px 14px; border-radius: 6px;
+  background: transparent; border: 1px solid rgba(255,255,255,0.08);
+  color: #4a4860; font-size: 12px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; transition: all 0.15s;
+}
+.m-btn-cancel:hover { color: #8a8799; border-color: rgba(255,255,255,0.15); }
+
+/* panels for different action types */
+.m-panel-view { display: none; }
+.m-panel-view.visible { display: block; }
+
+/* status bar */
+.m-statusbar {
+  height: 28px; background: #0a0a0f;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 14px; gap: 12px;
+}
+.m-chip {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: #4a4860; font-weight: 500;
+}
+.m-chip-dot { width: 5px; height: 5px; border-radius: 50%; background: #28CA41; }
+.m-chip-dot.off { background: #4a4860; }
+
+/* SECTIONS */
+section { position: relative; padding: 100px 40px; max-width: 1100px; margin: 0 auto; }
+.section-label { font-size: 12px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #f0b942; margin-bottom: 16px; }
+.section-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: clamp(32px, 4vw, 48px); letter-spacing: -1px; line-height: 1.1; color: var(--text); margin-bottom: 16px; }
+.section-sub { font-size: 17px; color: var(--text-muted); font-weight: 300; max-width: 520px; line-height: 1.7; }
+
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 64px; }
+.feature-card {
+  background: var(--bg-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  padding: 32px; position: relative; overflow: hidden; transition: all 0.3s;
+}
+.feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(232,160,32,0.5), transparent); opacity: 0; transition: opacity 0.3s; }
+.feature-card:hover { border-color: var(--border); transform: translateY(-2px); box-shadow: 0 16px 40px rgba(0,0,0,0.3); }
+.feature-card:hover::before { opacity: 1; }
+.feature-icon { width: 44px; height: 44px; background: rgba(232,160,32,0.1); border: 1px solid rgba(232,160,32,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 20px; }
+.feature-card h3 { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 17px; color: var(--text); margin-bottom: 10px; letter-spacing: -0.3px; }
+.feature-card p { font-size: 14px; color: var(--text-muted); line-height: 1.65; font-weight: 300; }
+.feature-tag { display: inline-block; margin-top: 16px; font-size: 11px; font-weight: 500; color: var(--gold); letter-spacing: 0.3px; }
+
+.how-section { border-top: 1px solid var(--border-subtle); }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 64px; position: relative; }
+.steps::before { content: ''; position: absolute; top: 28px; left: calc(16.66% + 28px); right: calc(16.66% + 28px); height: 1px; background: linear-gradient(90deg, var(--gold), var(--gold-light)); opacity: 0.3; }
+.step { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.step-num { width: 56px; height: 56px; background: var(--bg-3); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 20px; color: #f0b942; position: relative; z-index: 1; }
+.step h3 { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 18px; color: var(--text); letter-spacing: -0.3px; }
+.step p { font-size: 14px; color: var(--text-muted); line-height: 1.65; font-weight: 300; }
+
+.guide-cta { border-top: 1px solid var(--border-subtle); }
+.guide-card { background: linear-gradient(135deg, rgba(232,160,32,0.08) 0%, rgba(232,160,32,0.03) 100%); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 64px; display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center; position: relative; overflow: hidden; }
+.guide-card::before { content: ''; position: absolute; top: -60px; right: -60px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(232,160,32,0.08) 0%, transparent 70%); pointer-events: none; }
+.guide-card h2 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 32px; letter-spacing: -0.8px; color: var(--text); margin-bottom: 12px; }
+.guide-card p { font-size: 16px; color: var(--text-muted); font-weight: 300; line-height: 1.7; max-width: 480px; }
+.guide-features { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.guide-tag { background: rgba(255,255,255,0.05); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 4px 12px; font-size: 12px; color: var(--text-muted); }
+
+.download-section { border-top: 1px solid var(--border-subtle); text-align: center; }
+.download-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 80px 40px; position: relative; overflow: hidden; }
+.download-glow { position: absolute; bottom: -80px; left: 50%; transform: translateX(-50%); width: 600px; height: 300px; background: radial-gradient(ellipse at center, rgba(232,160,32,0.12) 0%, transparent 70%); pointer-events: none; }
+.download-card h2 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(36px, 5vw, 56px); letter-spacing: -1.5px; color: var(--text); margin-bottom: 16px; }
+.download-card p { font-size: 17px; color: var(--text-muted); font-weight: 300; margin-bottom: 40px; max-width: 440px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+.download-meta { display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 24px; font-size: 13px; color: var(--text-dim); }
+.download-meta-item { display: flex; align-items: center; gap: 6px; }
+.download-meta-item svg { width: 14px; height: 14px; opacity: 0.5; }
+
+footer { border-top: 1px solid var(--border-subtle); padding: 40px; display: flex; align-items: center; justify-content: space-between; max-width: 1100px; margin: 0 auto; }
+.footer-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.footer-wordmark { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; color: var(--text-muted); }
+.footer-links { display: flex; gap: 28px; }
+.footer-links a { font-size: 13px; color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+.footer-links a:hover { color: var(--text-muted); }
+.footer-copy { font-size: 13px; color: var(--text-dim); }
+
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 768px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  section { padding: 60px 20px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; }
+  .steps::before { display: none; }
+  .guide-card { grid-template-columns: 1fr; padding: 40px 24px; }
+  footer { flex-direction: column; gap: 20px; text-align: center; }
+  .m-panel { display: none; }
+  .m-sidebar { width: 160px; }
+}
 </style>
 </head>
 <body>
@@ -846,107 +393,124 @@
   <div class="nav-links">
     <a href="#features">Features</a>
     <a href="#how-it-works">How it works</a>
-    <a href="guide.html">Guide</a>
+    <a href="trigr-help.html">Guide</a>
     <a href="https://github.com/Trigr-it/trigr/releases/latest" class="nav-cta">Download</a>
   </div>
 </nav>
 
 <!-- HERO -->
-<div style="position:relative; overflow:hidden;">
+<div class="hero-wrap">
   <div class="grid-bg"></div>
-  <div style="position:relative; display:flex; flex-direction:column; align-items:center; padding-top:140px; padding-bottom:80px;">
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
 
     <div class="hero-badge">
       <span class="hero-badge-dot"></span>
       Alpha — Windows 10 &amp; 11
     </div>
 
-    <h1 style="font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(48px,7vw,88px); line-height:1.0; letter-spacing:-2px; color:var(--text); margin-bottom:24px; text-align:center; max-width:900px; padding:0 40px; animation:fadeInUp 0.6s 0.1s ease both;">
-      Your keyboard.<br><em>Supercharged.</em>
-    </h1>
+    <h1 class="hero-h1">Your keyboard.<br><em>Supercharged.</em></h1>
 
-    <p class="hero-sub">
-      Create hotkeys, macro sequences, and text expansions on Windows — no scripting, no config files. Just a clean visual interface.
-    </p>
+    <p class="hero-sub">Create hotkeys, macro sequences, and text expansions on Windows — no scripting, no config files. Just a clean visual interface.</p>
 
     <div class="hero-actions">
       <a href="https://github.com/Trigr-it/trigr/releases/latest" class="btn-primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-        </svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
         Download for Windows
       </a>
-      <a href="guide.html" class="btn-secondary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
-        </svg>
+      <a href="trigr-help.html" class="btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
         Read the guide
       </a>
     </div>
 
     <p class="hero-meta">Free to download &nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; ~77MB &nbsp;·&nbsp; Auto-updates</p>
 
-    <!-- APP PREVIEW -->
-    <div class="app-preview" style="padding:0 40px;">
-      <div class="preview-frame">
-        <div class="preview-titlebar">
-          <span class="dot dot-r"></span>
-          <span class="dot dot-y"></span>
-          <span class="dot dot-g"></span>
-          <span class="preview-title">Trigr — Default Profile</span>
-        </div>
-        <div class="preview-body">
-          <div class="preview-sidebar">
-            <div class="preview-sidebar-label">Assignments</div>
-            <div class="preview-item active">
-              <span>Type Text</span>
-              <span class="preview-item-key">Ctrl+E</span>
-            </div>
-            <div class="preview-item">
-              <span>Macro</span>
-              <span class="preview-item-key">Ctrl+R</span>
-            </div>
-            <div class="preview-item">
-              <span>Open App</span>
-              <span class="preview-item-key">Ctrl+T</span>
-            </div>
-            <div class="preview-item">
-              <span>Send Hotkey</span>
-              <span class="preview-item-key">Alt+Q</span>
-            </div>
+    <!-- INTERACTIVE MOCKUP -->
+    <div class="mockup-wrap">
+      <div class="mockup-shell">
+
+        <!-- Titlebar -->
+        <div class="m-titlebar">
+          <div class="m-tb-dots">
+            <div class="m-dot m-dot-r"></div>
+            <div class="m-dot m-dot-y"></div>
+            <div class="m-dot m-dot-g"></div>
           </div>
-          <div class="preview-main">
-            <div class="preview-keyboard">
-              <div class="key wide">Tab</div>
-              <div class="key assigned">Q</div>
-              <div class="key assigned">W</div>
-              <div class="key active">E</div>
-              <div class="key assigned">R</div>
-              <div class="key assigned">T</div>
-              <div class="key">Y</div>
-              <div class="key">U</div>
-              <div class="key">I</div>
-              <div class="key">O</div>
-              <div class="key">P</div>
-              <div class="key wider">Ctrl</div>
-              <div class="key">A</div>
-              <div class="key">S</div>
-              <div class="key">D</div>
-              <div class="key">F</div>
-              <div class="key">G</div>
-              <div class="key">H</div>
-              <div class="key">J</div>
-              <div class="key">K</div>
-              <div class="key">L</div>
-              <div class="key">;</div>
-            </div>
-            <div class="preview-action-panel">
-              <div class="preview-action-label">Action — Ctrl + E</div>
-              <div class="preview-type-pill">✦ Type Text</div>
-              <div class="preview-text-field">Hello, thanks for reaching out! I'll get back to you within 24 hours.</div>
-            </div>
+          <div class="m-tb-logo">
+            <div class="m-tb-logo-mark">T</div>
+            <span class="m-tb-wordmark">Trigr</span>
+          </div>
+          <div class="m-tb-sep"></div>
+          <div class="m-tabs">
+            <div class="m-tab active" onclick="switchTab(this,'default')">Default</div>
+            <div class="m-tab" onclick="switchTab(this,'chrome')">Chrome</div>
+            <div class="m-tab" onclick="switchTab(this,'vscode')">VS Code</div>
+          </div>
+          <div class="m-tb-right">
+            <div class="m-tb-btn" title="Settings">⚙</div>
+            <div class="m-tb-btn" title="Minimise">—</div>
           </div>
         </div>
+
+        <!-- Body -->
+        <div class="m-body">
+
+          <!-- Sidebar -->
+          <div class="m-sidebar">
+            <div class="m-sidebar-header">Modifier</div>
+            <div class="m-mod-bar">
+              <div class="m-mod active" id="mod-ctrl" onclick="selectMod('ctrl')">Ctrl</div>
+              <div class="m-mod" id="mod-alt" onclick="selectMod('alt')">Alt</div>
+              <div class="m-mod" id="mod-shift" onclick="selectMod('shift')">⇧</div>
+              <div class="m-mod" id="mod-win" onclick="selectMod('win')">⊞</div>
+            </div>
+            <div class="m-sidebar-header" style="padding-top:4px;">Assignments</div>
+            <div class="m-assignments" id="assignments-list"></div>
+          </div>
+
+          <!-- Keyboard -->
+          <div class="m-keyboard-area">
+            <div class="m-kb-rows" id="keyboard"></div>
+            <div style="font-size:10px;color:#4a4860;margin-top:4px;">Click any key to assign an action</div>
+          </div>
+
+          <!-- Action Panel -->
+          <div class="m-panel">
+            <div class="m-panel-header" id="panel-header">Select a key</div>
+            <div class="m-panel-content" id="panel-content">
+              <div id="panel-empty" style="color:#4a4860;font-size:13px;line-height:1.6;">Click any key on the keyboard to assign an action to it.</div>
+
+              <div class="m-panel-view" id="panel-assigned">
+                <div class="m-type-tabs">
+                  <div class="m-type-tab active" onclick="switchType(this,'type-text')">Type Text</div>
+                  <div class="m-type-tab" onclick="switchType(this,'hotkey')">Send Hotkey</div>
+                  <div class="m-type-tab" onclick="switchType(this,'macro')">Macro</div>
+                  <div class="m-type-tab" onclick="switchType(this,'open-app')">Open App</div>
+                </div>
+                <div id="action-type-content"></div>
+              </div>
+            </div>
+            <div class="m-panel-footer" id="panel-footer" style="display:none;">
+              <button class="m-btn-cancel" onclick="clearSelection()">Clear</button>
+              <button class="m-btn-save" onclick="saveAssignment()">Assign</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Status bar -->
+        <div class="m-statusbar">
+          <div class="m-chip"><span class="m-chip-dot"></span> Active</div>
+          <div class="m-chip" style="margin-left:8px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4a4860" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span id="assign-count">4 assignments</span>
+          </div>
+          <div class="m-chip" style="margin-left:auto;">
+            <span style="color:#4a4860;">v0.1.35</span>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -958,7 +522,6 @@
   <div class="section-label">Features</div>
   <h2 class="section-title">Everything your keyboard<br>should have been doing.</h2>
   <p class="section-sub">Six action types, app-specific profiles, and a visual keyboard that shows every assignment at a glance.</p>
-
   <div class="features-grid">
     <div class="feature-card">
       <div class="feature-icon">✦</div>
@@ -1004,7 +567,6 @@
   <div class="section-label">How it works</div>
   <h2 class="section-title">Up and running<br>in three steps.</h2>
   <p class="section-sub">No scripting, no config files, no learning curve. If you can click, you can automate.</p>
-
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
@@ -1032,7 +594,7 @@
       <h2>Learn everything<br>Trigr can do.</h2>
       <p>The complete guide covers every feature — hotkeys, macros, text expansions, app profiles, global variables, and more.</p>
       <div class="guide-features">
-        <span class="guide-tag">Hotkeys & Macros</span>
+        <span class="guide-tag">Hotkeys &amp; Macros</span>
         <span class="guide-tag">Text Expansions</span>
         <span class="guide-tag">App Profiles</span>
         <span class="guide-tag">Quick Search</span>
@@ -1041,15 +603,11 @@
       </div>
     </div>
     <div style="display:flex; flex-direction:column; gap:12px; flex-shrink:0;">
-      <a href="guide.html" class="btn-primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
-        </svg>
+      <a href="trigr-help.html" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
         Read the guide
       </a>
-      <a href="https://github.com/Trigr-it/trigr/releases/latest" class="btn-secondary" style="text-align:center; justify-content:center;">
-        Download Trigr
-      </a>
+      <a href="https://github.com/Trigr-it/trigr/releases/latest" class="btn-secondary" style="text-align:center; justify-content:center;">Download Trigr</a>
     </div>
   </div>
 </section>
@@ -1061,24 +619,13 @@
     <h2>Ready to move faster?</h2>
     <p>Download Trigr and start automating your keyboard in minutes. Free during alpha.</p>
     <a href="https://github.com/Trigr-it/trigr/releases/latest" class="btn-primary" style="font-size:16px; padding:16px 36px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-      </svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
       Download for Windows — Free
     </a>
     <div class="download-meta">
-      <span class="download-meta-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        Windows 10 / 11
-      </span>
-      <span class="download-meta-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-        ~77MB installer
-      </span>
-      <span class="download-meta-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-        Auto-updates
-      </span>
+      <span class="download-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Windows 10 / 11</span>
+      <span class="download-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>~77MB installer</span>
+      <span class="download-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Auto-updates</span>
     </div>
   </div>
 </section>
@@ -1091,12 +638,231 @@
   </a>
   <div class="footer-links">
     <a href="#features">Features</a>
-    <a href="guide.html">Guide</a>
+    <a href="trigr-help.html">Guide</a>
     <a href="https://github.com/Trigr-it/trigr">GitHub</a>
     <a href="https://github.com/Trigr-it/trigr/releases/latest">Download</a>
   </div>
   <span class="footer-copy">© 2026 Trigr</span>
 </footer>
 
+<script>
+// ── DATA ──
+const KB_ROWS = [
+  ['Esc','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'],
+  ['`','1','2','3','4','5','6','7','8','9','0','-','=','Bksp'],
+  ['Tab','Q','W','E','R','T','Y','U','I','O','P','[',']','\\'],
+  ['Caps','A','S','D','F','G','H','J','K','L',';',"'",'Enter'],
+  ['Shift','Z','X','C','V','B','N','M',',','.','/','Shift'],
+  ['Ctrl','Win','Alt','Space','Alt','Ctrl']
+];
+
+const WIDE_KEYS = ['Bksp','Tab','Caps','Enter','Shift','Ctrl','Win','Alt','Space'];
+const MOD_KEYS = ['Ctrl','Alt','Shift','Win','Caps','Tab','Esc','Enter','Bksp'];
+
+const PROFILES = {
+  default: {
+    name: 'Default',
+    assignments: {
+      'ctrl-E': { type: 'type-text', label: 'Type Text', text: "Hello, thanks for reaching out! I'll get back to you within 24 hours." },
+      'ctrl-R': { type: 'macro', label: 'Macro', steps: ['Open terminal', 'Run npm start', 'Wait 2s'] },
+      'ctrl-T': { type: 'open-app', label: 'Open App', path: 'C:\\Program Files\\Notepad++\\notepad++.exe' },
+      'alt-Q':  { type: 'hotkey', label: 'Send Hotkey', combo: 'Win+Shift+S' },
+    }
+  },
+  chrome: {
+    name: 'Chrome',
+    assignments: {
+      'ctrl-D': { type: 'type-text', label: 'Type Text', text: 'https://github.com/Trigr-it/trigr' },
+      'ctrl-K': { type: 'hotkey', label: 'Send Hotkey', combo: 'Ctrl+L' },
+      'alt-R':  { type: 'macro', label: 'Macro', steps: ['Ctrl+Shift+J', 'Wait 1s', 'Type console.log'] },
+    }
+  },
+  vscode: {
+    name: 'VS Code',
+    assignments: {
+      'ctrl-G': { type: 'type-text', label: 'Type Text', text: 'console.log(' },
+      'ctrl-B': { type: 'hotkey', label: 'Send Hotkey', combo: 'Ctrl+Shift+P' },
+      'alt-F':  { type: 'open-app', label: 'Open App', path: 'C:\\Windows\\System32\\cmd.exe' },
+    }
+  }
+};
+
+let currentProfile = 'default';
+let currentMod = 'ctrl';
+let selectedKey = null;
+let currentActionType = 'type-text';
+
+// ── KEYBOARD BUILDER ──
+function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  KB_ROWS.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'm-kb-row';
+    row.forEach(k => {
+      const el = document.createElement('div');
+      el.className = 'm-key';
+      if (WIDE_KEYS.includes(k)) el.classList.add(k === 'Space' ? 'widest' : k === 'Bksp' || k === 'Enter' ? 'wider' : 'wide');
+      if (MOD_KEYS.includes(k)) el.classList.add('mod-key');
+      el.textContent = k;
+      el.dataset.key = k;
+      el.addEventListener('click', () => onKeyClick(k));
+      rowEl.appendChild(el);
+    });
+    kb.appendChild(rowEl);
+  });
+  refreshKeyboard();
+}
+
+function getAssignKey(mod, key) { return mod + '-' + key; }
+
+function refreshKeyboard() {
+  const profile = PROFILES[currentProfile];
+  document.querySelectorAll('.m-key').forEach(el => {
+    const k = el.dataset.key;
+    el.classList.remove('assigned', 'selected');
+    if (profile.assignments[getAssignKey(currentMod, k)]) el.classList.add('assigned');
+    if (selectedKey === k) el.classList.add('selected');
+  });
+}
+
+function onKeyClick(k) {
+  if (MOD_KEYS.includes(k)) return;
+  selectedKey = k;
+  refreshKeyboard();
+  showPanel(k);
+}
+
+// ── PANEL ──
+function showPanel(k) {
+  const combo = getAssignKey(currentMod, k);
+  const profile = PROFILES[currentProfile];
+  const assignment = profile.assignments[combo];
+  const header = document.getElementById('panel-header');
+  const modLabel = currentMod.charAt(0).toUpperCase() + currentMod.slice(1);
+  header.textContent = 'Action — ' + modLabel + ' + ' + k;
+
+  document.getElementById('panel-empty').style.display = 'none';
+  const panelAssigned = document.getElementById('panel-assigned');
+  panelAssigned.classList.add('visible');
+  document.getElementById('panel-footer').style.display = 'flex';
+
+  if (assignment) {
+    currentActionType = assignment.type;
+    setActiveTypeTab(assignment.type);
+  } else {
+    currentActionType = 'type-text';
+    setActiveTypeTab('type-text');
+  }
+  renderActionContent(assignment);
+}
+
+function setActiveTypeTab(type) {
+  document.querySelectorAll('.m-type-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('onclick').includes("'" + type + "'"));
+  });
+}
+
+function renderActionContent(assignment) {
+  const el = document.getElementById('action-type-content');
+  if (currentActionType === 'type-text') {
+    el.innerHTML = '<div class="m-field-label">Text to type</div><textarea class="m-textarea" rows="5" placeholder="Enter text to type when hotkey is pressed...">' + (assignment && assignment.type === 'type-text' ? assignment.text : '') + '</textarea>';
+  } else if (currentActionType === 'hotkey') {
+    el.innerHTML = '<div class="m-field-label">Hotkey to send</div><input class="m-input" placeholder="Click to capture hotkey..." value="' + (assignment && assignment.type === 'hotkey' ? assignment.combo : '') + '" readonly>';
+  } else if (currentActionType === 'macro') {
+    const steps = assignment && assignment.type === 'macro' ? assignment.steps : [];
+    el.innerHTML = '<div class="m-field-label">Sequence steps</div>' + (steps.length ? steps.map((s,i) => '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="width:16px;height:16px;background:#1a1a24;border:1px solid rgba(255,255,255,0.08);border-radius:4px;font-size:9px;color:#4a4860;display:flex;align-items:center;justify-content:center;">'+(i+1)+'</span><span style="font-size:12px;color:#8a8799;flex:1;">'+s+'</span></div>').join('') : '<div style="color:#4a4860;font-size:12px;">No steps yet. Use the app to build a macro sequence.</div>');
+  } else if (currentActionType === 'open-app') {
+    el.innerHTML = '<div class="m-field-label">Application path</div><input class="m-input" placeholder="Browse for application..." value="' + (assignment && assignment.type === 'open-app' ? assignment.path : '') + '">';
+  }
+}
+
+function switchType(el, type) {
+  currentActionType = type;
+  document.querySelectorAll('.m-type-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderActionContent(null);
+}
+
+function clearSelection() {
+  selectedKey = null;
+  document.getElementById('panel-header').textContent = 'Select a key';
+  document.getElementById('panel-empty').style.display = 'block';
+  document.getElementById('panel-assigned').classList.remove('visible');
+  document.getElementById('panel-footer').style.display = 'none';
+  refreshKeyboard();
+}
+
+function saveAssignment() {
+  if (!selectedKey) return;
+  const combo = getAssignKey(currentMod, selectedKey);
+  const typeLabels = {'type-text':'Type Text','hotkey':'Send Hotkey','macro':'Macro','open-app':'Open App'};
+  PROFILES[currentProfile].assignments[combo] = { type: currentActionType, label: typeLabels[currentActionType] };
+  refreshSidebar();
+  refreshKeyboard();
+  updateCount();
+  // Flash the save button
+  const btn = document.querySelector('.m-btn-save');
+  btn.textContent = 'Saved ✓'; btn.style.background = '#28CA41';
+  setTimeout(() => { btn.textContent = 'Assign'; btn.style.background = ''; }, 1200);
+}
+
+// ── SIDEBAR ──
+function refreshSidebar() {
+  const list = document.getElementById('assignments-list');
+  list.innerHTML = '';
+  const assignments = PROFILES[currentProfile].assignments;
+  Object.entries(assignments).forEach(([key, val]) => {
+    const [mod, k] = key.split('-');
+    if (mod !== currentMod) return;
+    const el = document.createElement('div');
+    el.className = 'm-assign' + (selectedKey === k ? ' active' : '');
+    el.innerHTML = '<span>' + val.label + '</span><span class="m-assign-key">' + currentMod.charAt(0).toUpperCase() + currentMod.slice(1) + '+' + k + '</span>';
+    el.addEventListener('click', () => { selectedKey = k; refreshKeyboard(); showPanel(k); refreshSidebar(); });
+    list.appendChild(el);
+  });
+  if (!list.children.length) {
+    list.innerHTML = '<div style="font-size:11px;color:#4a4860;padding:8px;line-height:1.5;">No ' + currentMod + ' assignments yet.</div>';
+  }
+}
+
+function updateCount() {
+  const total = Object.keys(PROFILES[currentProfile].assignments).length;
+  document.getElementById('assign-count').textContent = total + ' assignment' + (total !== 1 ? 's' : '');
+}
+
+// ── MOD SWITCHING ──
+function selectMod(mod) {
+  currentMod = mod;
+  document.querySelectorAll('.m-mod').forEach(el => el.classList.toggle('active', el.id === 'mod-' + mod));
+  selectedKey = null;
+  document.getElementById('panel-header').textContent = 'Select a key';
+  document.getElementById('panel-empty').style.display = 'block';
+  document.getElementById('panel-assigned').classList.remove('visible');
+  document.getElementById('panel-footer').style.display = 'none';
+  refreshKeyboard();
+  refreshSidebar();
+}
+
+// ── PROFILE TABS ──
+function switchTab(el, profile) {
+  currentProfile = profile;
+  document.querySelectorAll('.m-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  selectedKey = null;
+  document.getElementById('panel-header').textContent = 'Select a key';
+  document.getElementById('panel-empty').style.display = 'block';
+  document.getElementById('panel-assigned').classList.remove('visible');
+  document.getElementById('panel-footer').style.display = 'none';
+  refreshKeyboard();
+  refreshSidebar();
+  updateCount();
+}
+
+// ── INIT ──
+buildKeyboard();
+refreshSidebar();
+updateCount();
+</script>
 </body>
 </html>
