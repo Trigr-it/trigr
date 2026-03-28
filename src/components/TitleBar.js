@@ -192,12 +192,9 @@ export default function TitleBar({
     <div className="titlebar" data-drag="true">
       <div className="titlebar-left">
         <div className="app-logo">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <rect x="2" y="5" width="6" height="4" rx="1.5" fill="var(--accent)" opacity="0.9"/>
-            <rect x="10" y="5" width="4" height="4" rx="1.5" fill="var(--accent)" opacity="0.6"/>
-            <rect x="16" y="5" width="2" height="4" rx="1" fill="var(--accent)" opacity="0.4"/>
-            <rect x="2" y="11" width="4" height="4" rx="1.5" fill="var(--accent)" opacity="0.5"/>
-            <rect x="8" y="11" width="10" height="4" rx="1.5" fill="var(--accent)" opacity="0.8"/>
+          <svg width="22" height="22" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+            <rect width="256" height="256" rx="52" fill="#e8a020"/>
+            <text x="128" y="182" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="168" fill="white" letter-spacing="-4">T</text>
           </svg>
           <span className="app-name">Trigr</span>
         </div>

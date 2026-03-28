@@ -2319,8 +2319,8 @@ function buildTrayMenu() {
 
 function createTray() {
   const iconPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'app-icon.png')
-    : path.join(__dirname, '..', 'public', 'app-icon.png');
+    ? path.join(process.resourcesPath, 'tray-icon.png')
+    : path.join(__dirname, '..', 'build', 'tray-icon.png');
 
   _normalTrayImage = nativeImage.createFromPath(iconPath);
   tray = new Tray(_normalTrayImage);
@@ -3055,8 +3055,8 @@ function createWindow() {
     frame: false,
     title: 'Trigr',
     icon: app.isPackaged
-      ? path.join(process.resourcesPath, 'app-icon.png')
-      : path.join(__dirname, '..', 'public', 'app-icon.png'),
+      ? path.join(process.resourcesPath, 'icon.png')
+      : path.join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#0d0d11',
     webPreferences: {
       nodeIntegration: true,
