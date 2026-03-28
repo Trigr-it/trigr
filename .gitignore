@@ -1,8 +1,5 @@
 node_modules/
-build/*
-!build/icon.png
-!build/tray-icon.png
-!build/icon-256.png
+build/
 dist/
 .env
 .env.local

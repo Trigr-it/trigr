@@ -91,11 +91,11 @@
         "to": "tray-icon.ico"
       },
       {
-        "from": "build/icon.png",
+        "from": "assets/icons/icon.png",
         "to": "icon.png"
       },
       {
-        "from": "build/tray-icon.png",
+        "from": "assets/icons/tray-icon.png",
         "to": "tray-icon.png"
       },
       {
@@ -117,7 +117,7 @@
           ]
         }
       ],
-      "icon": "build/icon.png",
+      "icon": "assets/icons/icon.png",
       "publisherName": "Trigr"
     },
     "nsis": {
