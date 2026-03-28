@@ -49,35 +49,6 @@ function _buildPNG(size, getPixel) {
   ]);
 }
 
-// ── Trigr logo renderer (matches gen-app-icon.js / TitleBar.js SVG) ───────
-const _LOGO_ACCENT = [232, 160, 32]; // #e8a020
-const _LOGO_RECTS  = [
-  { x: 2,  y: 5,  w: 6,  h: 4, rx: 1.5, op: 0.9 },
-  { x: 10, y: 5,  w: 4,  h: 4, rx: 1.5, op: 0.6 },
-  { x: 16, y: 5,  w: 2,  h: 4, rx: 1.0, op: 0.4 },
-  { x: 2,  y: 11, w: 4,  h: 4, rx: 1.5, op: 0.5 },
-  { x: 8,  y: 11, w: 10, h: 4, rx: 1.5, op: 0.8 },
-];
-function _insideRRect(fx, fy, rx, ry, rw, rh, radius) {
-  if (fx < rx || fx > rx + rw || fy < ry || fy > ry + rh) return false;
-  const dx = Math.max(rx + radius - fx, 0, fx - (rx + rw - radius));
-  const dy = Math.max(ry + radius - fy, 0, fy - (ry + rh - radius));
-  return dx * dx + dy * dy <= radius * radius;
-}
-function _logoPixel(px, py, size) {
-  const scale = size / 20, S = 4, step = 1/S, half = step/2;
-  let hits = 0, maxOp = 0;
-  for (let sy = 0; sy < S; sy++) for (let sx = 0; sx < S; sx++) {
-    const fx = px + half + sx * step, fy = py + half + sy * step;
-    for (const r of _LOGO_RECTS)
-      if (_insideRRect(fx, fy, r.x*scale, r.y*scale, r.w*scale, r.h*scale, r.rx*scale)) { hits++; break; }
-  }
-  if (hits === 0) return [0, 0, 0, 0];
-  for (const r of _LOGO_RECTS)
-    if (_insideRRect(px+.5, py+.5, r.x*scale, r.y*scale, r.w*scale, r.h*scale, r.rx*scale) && r.op > maxOp) maxOp = r.op;
-  return [..._LOGO_ACCENT, Math.round(hits / (S*S) * maxOp * 255)];
-}
-
 // ── Pause overlay icon — taskbar window button badge (32×32) ───────────────
 // Full circle with pause bars; transparent background so Windows composites it.
 const _pauseOverlayImage = (() => {
@@ -102,10 +73,14 @@ const _pauseOverlayImage = (() => {
   return nativeImage.createFromBuffer(buf, { scaleFactor: 1.0 });
 })();
 
-// ── Paused tray icon — 32×32 Trigr logo + pause badge bottom-right ────────
-const _pausedTrayImage = (() => {
+let _normalTrayImage = null; // set in createTray(), used to restore on unpause
+let _pausedTrayImage = null; // built in createTray() from _normalTrayImage + pause badge
+
+// ── Paused tray icon builder — called in createTray() once _normalTrayImage is set ──
+// Composites a pause badge onto the loaded tray-icon.png so both states use the same T logo.
+function _buildPausedTrayImage(baseImage) {
   const SIZE = 32;
-  // Badge: small circle in bottom-right corner
+  // Badge: small circle in bottom-right corner (geometry unchanged from original)
   const BCX = 24.5, BCY = 24.5, BR = 7.5;
   const PBARS = [{ x1: 20, y1: 19, x2: 22, y2: 30 }, { x1: 25, y1: 19, x2: 27, y2: 30 }];
   const S = 4;
@@ -118,18 +93,21 @@ const _pausedTrayImage = (() => {
     return h / (S*S);
   }
   function inPauseBar(px, py) { return PBARS.some(b => px >= b.x1 && px <= b.x2 && py >= b.y1 && py <= b.y2); }
+  // Get raw BGRA pixel data from the base icon, resized to SIZE×SIZE
+  const bitmap = baseImage.resize({ width: SIZE, height: SIZE }).toBitmap();
+  function basePixel(x, y) {
+    const o = (y * SIZE + x) * 4; // BGRA layout on Windows
+    return [bitmap[o + 2], bitmap[o + 1], bitmap[o], bitmap[o + 3]]; // → RGBA
+  }
   const buf = _buildPNG(SIZE, (x, y) => {
     const bc = badgeCov(x, y);
     if (bc > 0) {
-      // Badge takes priority over logo — dark bg or white bar
       return inPauseBar(x, y) ? [255, 255, 255, Math.round(bc*230)] : [0, 0, 0, Math.round(bc*210)];
     }
-    return _logoPixel(x, y, SIZE);
+    return basePixel(x, y);
   });
   return nativeImage.createFromBuffer(buf, { scaleFactor: 1.0 });
-})();
-
-let _normalTrayImage = null; // set in createTray(), used to restore on unpause
+}
 
 const isDev      = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const isDemoMode = process.argv.includes('--demo-mode');
@@ -2323,6 +2301,7 @@ function createTray() {
     : path.join(__dirname, '..', 'build', 'tray-icon.png');
 
   _normalTrayImage = nativeImage.createFromPath(iconPath);
+  _pausedTrayImage = _buildPausedTrayImage(_normalTrayImage);
   tray = new Tray(_normalTrayImage);
   tray.setToolTip('Trigr — Macro Engine Active'); // updateTrayTooltip() called after tray is set
   tray.on('click', showWindow);
