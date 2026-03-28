@@ -184,7 +184,11 @@ export default function KeyboardCanvas({
     if (!el) return;
     let lastWidth = 0;
     const ro = new ResizeObserver(entries => {
-      const availableWidth = entries[0].contentRect.width;
+      // Divide by devicePixelRatio to normalise to logical CSS pixels.
+      // On Windows, BrowserWindow dimensions can be interpreted as physical pixels,
+      // so contentRect.width may be larger at 100% DPI than at 150% DPI for the same
+      // window spec. Normalising ensures a consistent scale across display scaling levels.
+      const availableWidth = entries[0].contentRect.width / window.devicePixelRatio;
       if (availableWidth > 0 && Math.abs(availableWidth - lastWidth) >= 1) {
         lastWidth = availableWidth;
         setScale(Math.max(0.3, availableWidth / KEYBOARD_NATURAL_WIDTH));

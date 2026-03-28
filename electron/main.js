@@ -3052,6 +3052,7 @@ function createWindow() {
     height: 780,
     minWidth: 640,
     minHeight: 500,
+    useContentSize: true, // ensures width/height refer to CSS viewport, not outer frame
     frame: false,
     title: 'Trigr',
     icon: app.isPackaged
