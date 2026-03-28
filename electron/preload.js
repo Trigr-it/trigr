@@ -89,6 +89,11 @@ window.electronAPI = {
   removeAllListeners: (channel) =>
     ipcRenderer.removeAllListeners(channel),
 
+  // Key capture (Press Key macro step + Send Hotkey field)
+  startKeyCapture: ()         => ipcRenderer.send('start-key-capture'),
+  stopKeyCapture:  ()         => ipcRenderer.send('stop-key-capture'),
+  onKeyCaptured:   (callback) => ipcRenderer.on('key-captured', (_, combo) => callback(combo)),
+
   // Quick Search overlay
   closeOverlay:          ()          => ipcRenderer.send('close-overlay'),
   resizeOverlay:         (height)    => ipcRenderer.send('overlay-resize', { height }),

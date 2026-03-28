@@ -120,63 +120,91 @@ function TextForm({ value, onChange, globalInputMethod }) {
   );
 }
 
-function HotkeyForm({ value, onChange }) {
-  const [selectedMods, setSelectedMods] = useState(value.modifiers || []);
-  const [selectedKey, setSelectedKey] = useState(value.key || '');
+// Converts hotkey data object → display string e.g. { modifiers: ['Ctrl'], key: 'F4' } → "Ctrl+F4"
+function hotkeyDataToString(data) {
+  return [...(data.modifiers || []), data.key || ''].filter(Boolean).join('+');
+}
 
-  useEffect(() => {
-    onChange({ ...value, modifiers: selectedMods, key: selectedKey });
-  }, [selectedMods, selectedKey]);
-
-  const toggleMod = (mod) => {
-    setSelectedMods(prev =>
-      prev.includes(mod) ? prev.filter(m => m !== mod) : [...prev, mod]
-    );
+// Parses a captured combo string → hotkey data fields e.g. "Ctrl+Win+F4" → { modifiers: [...], key: 'F4' }
+const HOTKEY_MODS = new Set(['Ctrl', 'Shift', 'Alt', 'Win']);
+function parseHotkeyCapture(str) {
+  const parts = str.split('+');
+  return {
+    modifiers: parts.filter(p => HOTKEY_MODS.has(p)),
+    key:       parts.find(p => !HOTKEY_MODS.has(p)) || '',
   };
+}
 
-  const preview = [...selectedMods, selectedKey].filter(Boolean).join(' + ');
+function HotkeyCaptureInput({ value, onChange }) {
+  const [capturing, setCapturing] = useState(false);
+  const divRef        = useRef(null);
+  const onChangeRef   = useRef(onChange);
+  const valueRef      = useRef(value);
+  const capturingRef  = useRef(false);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { valueRef.current    = value;    }, [value]);
+  // Keep capturingRef in sync so the IPC handler can gate on it
+  useEffect(() => { capturingRef.current = capturing; }, [capturing]);
+
+  // IPC path: main process captures keypresses (including Win key) and sends result
+  useEffect(() => {
+    if (!window.electronAPI?.onKeyCaptured) return;
+    const handler = (combo) => {
+      if (!capturingRef.current) return; // guard: only process if this instance is active
+      onChangeRef.current({ ...valueRef.current, ...parseHotkeyCapture(combo) });
+      setCapturing(false);
+    };
+    window.electronAPI.onKeyCaptured(handler);
+    return () => window.electronAPI.removeAllListeners('key-captured');
+  }, []);
+
+  function startCapture() {
+    setCapturing(true);
+    divRef.current?.focus();
+    window.electronAPI?.startKeyCapture();
+  }
+
+  function handleKeyDown(e) {
+    // Only intercept Escape — all other keys are captured by the main process
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      window.electronAPI?.stopKeyCapture();
+      setCapturing(false);
+      divRef.current?.blur();
+    }
+  }
+
+  function handleBlur() {
+    if (capturing) {
+      window.electronAPI?.stopKeyCapture();
+      setCapturing(false);
+    }
+  }
+
+  const currentCombo = hotkeyDataToString(value);
 
   return (
     <div className="form-section">
-      <label className="form-label">Modifier keys</label>
-      <div className="modifier-grid">
-        {MODIFIER_KEYS.map(mod => (
-          <button
-            key={mod}
-            className={`mod-btn ${selectedMods.includes(mod) ? 'active' : ''}`}
-            onClick={() => toggleMod(mod)}
-            type="button"
-          >
-            {mod}
-          </button>
-        ))}
-      </div>
-
-      <label className="form-label" style={{ marginTop: 14 }}>Key</label>
-      <select
-        className="form-select"
-        value={selectedKey}
-        onChange={e => setSelectedKey(e.target.value)}
+      <label className="form-label">Hotkey</label>
+      <div
+        ref={divRef}
+        className={`key-capture${capturing ? ' key-capture-active' : ''}`}
+        tabIndex={0}
+        onClick={startCapture}
+        onKeyDown={capturing ? handleKeyDown : undefined}
+        onBlur={handleBlur}
+        role="button"
+        aria-label={capturing ? 'Press your hotkey combination' : currentCombo || 'Click to capture hotkey'}
       >
-        <option value="">— Select key —</option>
-        {TRIGGER_KEYS.map(k => (
-          <option key={k} value={k}>{k}</option>
-        ))}
-      </select>
-
-      {preview && (
-        <div className="hotkey-preview">
-          <span className="hotkey-preview-label">Preview:</span>
-          {[...selectedMods, selectedKey].filter(Boolean).map((k, i) => (
-            <React.Fragment key={k}>
-              <kbd>{k}</kbd>
-              {i < [...selectedMods, selectedKey].filter(Boolean).length - 1 && (
-                <span className="hotkey-plus">+</span>
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      )}
+        {capturing ? (
+          <span className="key-capture-prompt">Press your hotkey combination…</span>
+        ) : currentCombo ? (
+          <span className="key-capture-value"><KeyChips combo={currentCombo} /></span>
+        ) : (
+          <span className="key-capture-placeholder">Click to capture hotkey…</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -269,33 +297,64 @@ const KEY_DISPLAY_MAP = {
   'Insert': 'Insert', 'PrintScreen': 'PrintScreen',
 };
 
+// Shared helper: render captured key combo as <kbd> chips
+function KeyChips({ combo }) {
+  const keys = combo ? combo.split('+') : [];
+  return (
+    <>
+      {keys.map((k, i) => (
+        <Fragment key={i}>
+          <kbd>{k}</kbd>
+          {i < keys.length - 1 && <span className="key-capture-plus">+</span>}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 function KeyCaptureInput({ value, onChange }) {
   const [capturing, setCapturing] = useState(false);
-  const divRef = useRef(null);
+  const divRef       = useRef(null);
+  const onChangeRef  = useRef(onChange);
+  const capturingRef = useRef(false);
+  useEffect(() => { onChangeRef.current  = onChange;   }, [onChange]);
+  useEffect(() => { capturingRef.current = capturing;  }, [capturing]);
+
+  // IPC path: main process captures keypresses (including Win key) and sends result
+  useEffect(() => {
+    if (!window.electronAPI?.onKeyCaptured) return;
+    const handler = (combo) => {
+      if (!capturingRef.current) return; // guard: only process if this instance is active
+      onChangeRef.current(combo);
+      setCapturing(false);
+    };
+    window.electronAPI.onKeyCaptured(handler);
+    return () => window.electronAPI.removeAllListeners('key-captured');
+  }, []);
 
   function startCapture() {
     setCapturing(true);
     divRef.current?.focus();
+    window.electronAPI?.startKeyCapture();
   }
 
   function handleKeyDown(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    // Ignore bare modifier presses — wait for a real key
-    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
-    const parts = [];
-    if (e.ctrlKey)  parts.push('Ctrl');
-    if (e.shiftKey) parts.push('Shift');
-    if (e.altKey)   parts.push('Alt');
-    if (e.metaKey)  parts.push('Win');
-    const mapped = KEY_DISPLAY_MAP[e.key] ?? (e.key.length === 1 ? e.key.toUpperCase() : e.key);
-    parts.push(mapped);
-    onChange(parts.join('+'));
-    setCapturing(false);
-    divRef.current?.blur();
+    // Only intercept Escape — all other keys are captured by the main process
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      window.electronAPI?.stopKeyCapture();
+      setCapturing(false);
+      divRef.current?.blur();
+    }
   }
 
-  const keys = value ? value.split('+') : [];
+  function handleBlur() {
+    if (capturing) {
+      window.electronAPI?.stopKeyCapture();
+      setCapturing(false);
+    }
+  }
 
   return (
     <div
@@ -304,21 +363,14 @@ function KeyCaptureInput({ value, onChange }) {
       tabIndex={0}
       onClick={startCapture}
       onKeyDown={capturing ? handleKeyDown : undefined}
-      onBlur={() => setCapturing(false)}
+      onBlur={handleBlur}
       role="button"
       aria-label={capturing ? 'Press a key combination' : value || 'Click to capture key'}
     >
       {capturing ? (
         <span className="key-capture-prompt">Press a key…</span>
-      ) : keys.length > 0 ? (
-        <span className="key-capture-value">
-          {keys.map((k, i) => (
-            <Fragment key={i}>
-              <kbd>{k}</kbd>
-              {i < keys.length - 1 && <span className="key-capture-plus">+</span>}
-            </Fragment>
-          ))}
-        </span>
+      ) : value ? (
+        <span className="key-capture-value"><KeyChips combo={value} /></span>
       ) : (
         <span className="key-capture-placeholder">Click to capture…</span>
       )}
@@ -929,7 +981,7 @@ export default function MacroPanel({
         {/* Dynamic form */}
         <div className="form-body">
           {activeType === 'text'   && <TextForm value={formValue} onChange={setFormValue} globalInputMethod={globalInputMethod} />}
-          {activeType === 'hotkey' && <HotkeyForm value={formValue} onChange={setFormValue} />}
+          {activeType === 'hotkey' && <HotkeyCaptureInput value={formValue} onChange={setFormValue} />}
           {activeType === 'app'    && <AppForm value={formValue} onChange={setFormValue} />}
           {activeType === 'folder' && <FolderForm value={formValue} onChange={setFormValue} />}
           {activeType === 'url'    && <UrlForm value={formValue} onChange={setFormValue} />}

@@ -210,6 +210,19 @@ function App() {
     };
   }, []);
 
+  // ── Escape clears modifier selection (only when no key is selected) ──
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key !== 'Escape') return;
+      if (selectedKey) return;           // action panel is open — do nothing
+      if (activeModifiers.length === 0) return; // nothing to clear
+      e.preventDefault();
+      setActiveModifiers([]);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [selectedKey, activeModifiers]);
+
   // ── Sync to engine whenever assignments/profile changes ───
   const syncEngine = useCallback((newAssignments, profile) => {
     window.electronAPI?.updateAssignments(newAssignments, profile);

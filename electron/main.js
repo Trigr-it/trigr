@@ -433,6 +433,20 @@ let appInputFocused = false;
 // as a 'hotkey-recorded' event instead of triggering a macro.
 let _isRecordingHotkey = false;
 
+// When true, the next non-modifier keypress is captured and sent via 'key-captured' IPC.
+// Win+key combos are captured via temporary RegisterHotKey registrations (see WM_HOTKEY handler).
+let _isCapturingKey       = false;
+// Set to a modifier name ('Ctrl'|'Alt'|'Shift'|'Win') when exactly one modifier has been pressed
+// during capture mode and no non-modifier key has been pressed yet. Cleared as soon as any second
+// key is pressed. Checked on modifier keyup to fire a bare modifier capture.
+let _captureSoleModifier  = null;
+const _captureWinIds   = new Map(); // hotkey id → { keyId, mods } for temp Win+key registrations
+const CAPTURE_WIN_BASE = 0xFD00;    // reserved ID range for transient key-capture registrations
+
+// Win+key registrations used during hotkey-recording mode for OS-level suppression.
+const _recordWinIds    = new Map(); // hotkey id → { keyId, mods }
+const RECORD_WIN_BASE  = 0xFC00;    // reserved ID range for transient hotkey-record registrations
+
 // Macro matched on keydown but deferred until all modifier keys are physically
 // released (keyup).  Guarantees no held physical keys interfere with output.
 let pendingMacro = null;
@@ -988,6 +1002,8 @@ function getNutKey(keyName) {
     '0': Key.Num0, '1': Key.Num1, '2': Key.Num2, '3': Key.Num3,
     '4': Key.Num4, '5': Key.Num5, '6': Key.Num6, '7': Key.Num7,
     '8': Key.Num8, '9': Key.Num9,
+    // Bare modifier keys — captured when a modifier is pressed and released alone
+    'CTRL': Key.LeftControl, 'ALT': Key.LeftAlt, 'SHIFT': Key.LeftShift, 'WIN': Key.LeftSuper,
   };
   return map[keyName.toUpperCase()] || null;
 }
@@ -1667,24 +1683,65 @@ function startHotkeyListener() {
     // keydown events *after* the character keydown, so a character can leak into
     // the buffer before we know a modifier is held.  Clearing on modifier-down
     // prevents that leaked character from ever triggering an expansion.
-    if (keyId === 'ControlLeft' || keyId === 'ControlRight') { modifierState.ctrl  = true; keypressBuffer = ''; return; }
-    if (keyId === 'AltLeft'     || keyId === 'AltRight')     { modifierState.alt   = true; keypressBuffer = ''; return; }
-    if (keyId === 'ShiftLeft'   || keyId === 'ShiftRight')   { modifierState.shift = true; keypressBuffer = ''; return; }
-    if (keyId === 'MetaLeft'    || keyId === 'MetaRight')    { modifierState.meta  = true; keypressBuffer = ''; return; }
+    if (keyId === 'ControlLeft' || keyId === 'ControlRight') {
+      modifierState.ctrl = true; keypressBuffer = '';
+      if (_isCapturingKey) _captureSoleModifier = (modifierState.alt || modifierState.shift || modifierState.meta) ? null : 'Ctrl';
+      return;
+    }
+    if (keyId === 'AltLeft' || keyId === 'AltRight') {
+      modifierState.alt = true; keypressBuffer = '';
+      if (_isCapturingKey) _captureSoleModifier = (modifierState.ctrl || modifierState.shift || modifierState.meta) ? null : 'Alt';
+      return;
+    }
+    if (keyId === 'ShiftLeft' || keyId === 'ShiftRight') {
+      modifierState.shift = true; keypressBuffer = '';
+      if (_isCapturingKey) _captureSoleModifier = (modifierState.ctrl || modifierState.alt || modifierState.meta) ? null : 'Shift';
+      return;
+    }
+    if (keyId === 'MetaLeft' || keyId === 'MetaRight') {
+      modifierState.meta = true; keypressBuffer = '';
+      if (_isCapturingKey) _captureSoleModifier = (modifierState.ctrl || modifierState.alt || modifierState.shift) ? null : 'Win';
+      return;
+    }
     if (MODIFIER_KEY_IDS.has(keyId)) return;
 
-    // Hotkey recording mode — capture modifiers + key, send to renderer, suppress macro
+    // Hotkey recording mode — capture modifiers + key, send to renderer, suppress macro.
+    // Win+key combos normally arrive via WM_HOTKEY (suppressed at OS level), but if koffi
+    // is unavailable the uiohook path is the fallback — event.metaKey is authoritative because
+    // Windows fires Win keyup before the non-modifier keydown for system shortcuts.
     if (_isRecordingHotkey) {
       _isRecordingHotkey = false;
+      _stopRecordWinCapture(); // unregister transient Win registrations (no-op if not registered)
       const recMods = [];
-      if (modifierState.ctrl)  recMods.push('Ctrl');
-      if (modifierState.shift) recMods.push('Shift');
-      if (modifierState.alt)   recMods.push('Alt');
-      if (modifierState.meta)  recMods.push('Win');
-      console.log(`[KeyForge] Hotkey recorded: [${recMods.join('+')}] + ${keyId}`);
+      if (modifierState.ctrl  || event.ctrlKey)  recMods.push('Ctrl');
+      if (modifierState.shift || event.shiftKey) recMods.push('Shift');
+      if (modifierState.alt   || event.altKey)   recMods.push('Alt');
+      if (modifierState.meta  || event.metaKey)  recMods.push('Win');
+      console.log(`[KeyForge] Hotkey recorded (uiohook): [${recMods.join('+')}] + ${keyId}`);
       mainWindow?.webContents.send('hotkey-recorded',
         keyId === 'Escape' ? null : { modifiers: recMods, keyId }
       );
+      return;
+    }
+
+    // Key capture mode (Press Key / Send Hotkey fields) — capture and return to renderer.
+    // Win+key combos arrive via WM_HOTKEY (handled above). Non-Win combos arrive here.
+    // Escape cancels capture (renderer handles it via 'stop-key-capture').
+    if (_isCapturingKey && keyId !== 'Escape') {
+      _captureSoleModifier = null; // a non-modifier key was pressed — not a bare modifier capture
+      const parts = [];
+      if (modifierState.ctrl  || event.ctrlKey)  parts.push('Ctrl');
+      if (modifierState.shift || event.shiftKey) parts.push('Shift');
+      if (modifierState.alt   || event.altKey)   parts.push('Alt');
+      // Win+key and Win+Shift+key combos arrive via WM_HOTKEY (both registered in start-key-capture).
+      // If koffi is unavailable, fall back to event.metaKey from uiohook.
+      if (event.metaKey) parts.push('Win');
+      console.log(`[KeyForge] _isCapturingKey (uiohook fallback): event.metaKey=${event.metaKey} modifierState.meta=${modifierState.meta}`);
+      parts.push(_uiohookKeyIdToDisplay(keyId));
+      const combo = parts.join('+');
+      _stopKeyCapture();
+      console.log(`[KeyForge] Key captured: ${combo}`);
+      mainWindow?.webContents.send('key-captured', combo);
       return;
     }
 
@@ -1897,6 +1954,21 @@ function startHotkeyListener() {
     if (keyId === 'AltLeft'     || keyId === 'AltRight')     modifierState.alt   = false;
     if (keyId === 'ShiftLeft'   || keyId === 'ShiftRight')   modifierState.shift = false;
     if (keyId === 'MetaLeft'    || keyId === 'MetaRight')    modifierState.meta  = false;
+
+    // Bare modifier capture: if we're in key-capture mode, exactly one modifier was pressed,
+    // no non-modifier key was pressed in between, and all modifiers are now released.
+    if (
+      _isCapturingKey &&
+      _captureSoleModifier !== null &&
+      !modifierState.ctrl && !modifierState.alt && !modifierState.shift && !modifierState.meta
+    ) {
+      const captured = _captureSoleModifier;
+      _captureSoleModifier = null;
+      _stopKeyCapture();
+      console.log(`[KeyForge] Key captured (bare modifier): ${captured}`);
+      mainWindow?.webContents.send('key-captured', captured);
+      return;
+    }
 
     // Execute the deferred macro once every modifier key has been physically
     // released.  This guarantees no held physical key interferes with output.
@@ -2381,11 +2453,80 @@ ipcMain.on('input-focus-changed', (_event, focused) => {
 // Hotkey recording — next non-modifier keypress is captured and sent back
 ipcMain.on('start-hotkey-recording', () => {
   _isRecordingHotkey = true;
-  console.log('[KeyForge] Hotkey recording started — waiting for keypress');
+  if (koffiAvailable) {
+    // Register Win+[key] and Win+Shift+[key] to suppress OS shortcuts (e.g. Win+Shift+S →
+    // Snipping Tool) and route them through WM_HOTKEY instead.
+    let id = RECORD_WIN_BASE;
+    for (const [keyId, vk] of Object.entries(VK_CODE_MAP)) {
+      if (koffiRegisterHotKey(_koffiHwnd, id, MOD_WIN | MOD_NOREPEAT, vk))
+        _recordWinIds.set(id, { keyId, mods: ['Win'] });
+      id++;
+      if (koffiRegisterHotKey(_koffiHwnd, id, MOD_WIN | MOD_SHIFT | MOD_NOREPEAT, vk))
+        _recordWinIds.set(id, { keyId, mods: ['Win', 'Shift'] });
+      id++;
+    }
+    console.log(`[KeyForge] Hotkey recording started — registered ${_recordWinIds.size} Win suppression intercepts`);
+  } else {
+    console.log('[KeyForge] Hotkey recording started — waiting for keypress (koffi unavailable, Win suppression disabled)');
+  }
 });
 ipcMain.on('stop-hotkey-recording', () => {
   _isRecordingHotkey = false;
+  _stopRecordWinCapture();
   console.log('[KeyForge] Hotkey recording cancelled');
+});
+
+// ── Key capture (Press Key / Send Hotkey fields) ────────────────────────────
+// Converts a uiohook keyId (e.g. "KeyA", "Digit3", "ArrowLeft") to the display
+// name used by KeyCaptureInput / HotkeyCaptureInput (e.g. "A", "3", "Left").
+function _uiohookKeyIdToDisplay(keyId) {
+  if (/^Key([A-Z])$/.test(keyId))  return keyId.slice(3);  // KeyA → A
+  if (/^Digit(\d)$/.test(keyId))   return keyId.slice(5);  // Digit3 → 3
+  const specials = {
+    'ArrowUp': 'Up', 'ArrowDown': 'Down', 'ArrowLeft': 'Left', 'ArrowRight': 'Right',
+  };
+  return specials[keyId] ?? keyId; // F1, Space, Enter, Escape, Tab, Delete, etc. pass through
+}
+
+function _stopKeyCapture() {
+  _isCapturingKey = false;
+  _captureSoleModifier = null;
+  for (const id of _captureWinIds.keys()) {
+    koffiUnregisterHotKey?.(_koffiHwnd, id);
+  }
+  _captureWinIds.clear();
+}
+
+function _stopRecordWinCapture() {
+  for (const id of _recordWinIds.keys()) {
+    koffiUnregisterHotKey?.(_koffiHwnd, id);
+  }
+  _recordWinIds.clear();
+}
+
+// When a capture field becomes active, signal here so the main process can intercept
+// keypresses (including Win+key) at OS level and return them via 'key-captured' IPC.
+ipcMain.on('start-key-capture', () => {
+  _isCapturingKey = true;
+  if (!koffiAvailable) { console.log('[KeyForge] start-key-capture: koffi unavailable — Win+key via WM_HOTKEY disabled, falling back to event.metaKey'); return; }
+  // Temporarily register Win+[key] and Win+Shift+[key] for every capturable key.
+  // Both variants must be registered so that combos like Win+Shift+S suppress the OS
+  // shortcut (e.g. Snipping Tool) and are routed through WM_HOTKEY instead.
+  let id = CAPTURE_WIN_BASE;
+  for (const [keyId, vk] of Object.entries(VK_CODE_MAP)) {
+    if (koffiRegisterHotKey(_koffiHwnd, id, MOD_WIN | MOD_NOREPEAT, vk))
+      _captureWinIds.set(id, { keyId, mods: ['Win'] });
+    id++;
+    if (koffiRegisterHotKey(_koffiHwnd, id, MOD_WIN | MOD_SHIFT | MOD_NOREPEAT, vk))
+      _captureWinIds.set(id, { keyId, mods: ['Win', 'Shift'] });
+    id++;
+  }
+  console.log(`[KeyForge] Key capture started — registered ${_captureWinIds.size}/${Object.keys(VK_CODE_MAP).length * 2} Win+key intercepts`);
+});
+
+ipcMain.on('stop-key-capture', () => {
+  _stopKeyCapture();
+  console.log('[KeyForge] Key capture cancelled');
 });
 
 // Autocorrect toggle
@@ -2944,6 +3085,26 @@ function createWindow() {
       }
       if (id === OVERLAY_HOTKEY_ID) {
         toggleOverlay();
+        return;
+      }
+      // Transient Win+key registration — part of hotkey-recording mode
+      if (_recordWinIds.has(id)) {
+        const { keyId: capturedKey, mods } = _recordWinIds.get(id);
+        _isRecordingHotkey = false;
+        _stopRecordWinCapture();
+        const combo = [...mods, capturedKey].join('+');
+        console.log(`[KeyForge] Hotkey recorded via WM_HOTKEY: ${combo}`);
+        mainWindow?.webContents.send('hotkey-recorded', { modifiers: mods, keyId: capturedKey });
+        return;
+      }
+      // Transient Win+key registration — part of key-capture mode
+      if (_captureWinIds.has(id)) {
+        const { keyId: capturedKey, mods } = _captureWinIds.get(id);
+        const display = _uiohookKeyIdToDisplay(capturedKey);
+        _stopKeyCapture();
+        const combo = [...mods, display].join('+');
+        console.log(`[KeyForge] Key captured via WM_HOTKEY: ${combo}`);
+        mainWindow?.webContents.send('key-captured', combo);
         return;
       }
       const entry = registeredHotkeys.get(id);
