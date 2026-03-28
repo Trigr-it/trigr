@@ -1,6 +1,6 @@
 {
   "name": "keyforge",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "description": "Visual Hotkey & Macro Manager",
   "author": "Trigr",
   "main": "electron/main.js",
