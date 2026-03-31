@@ -45,6 +45,11 @@
 | Auto-updater | Direct HTTPS download — DO NOT MODIFY |
 | Keyboard scaling fix | Width-only ResizeObserver, no devicePixelRatio |
 | 77MB installer | NSIS |
+| Bundled fonts (offline) | 10 woff2 files in public/fonts/, loaded via public/fonts.css — no CDN dependency |
+| Syne 800 wordmark | Header logo text uses Syne 800. T icon removed. Colour: var(--text-primary). |
+| Start with Windows — silent launch | Auto-launch detected via --autolaunch arg. Window hidden on startup; tray icon only. |
+| Foreground watcher visibility guard | Profile auto-switching suppressed while main window is visible. Resumes on hide/minimise. |
+| Esc clears sidebar to All tab | Pressing Esc to clear modifier selection now resets sidebar tab to "All" |
 
 ---
 

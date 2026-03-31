@@ -51,6 +51,41 @@ All config writes are owned by `main.js`. The renderer never writes directly to 
 ### 5. Help Guide Scaling
 The scaling IIFE must not intercept `window.show`. Call `_trigrRescale` directly from `show()`. Hide `.kf` elements via `visibility:hidden` until `kf-ready` class is added post-scaling, with 150ms opacity fade-in to prevent snap-in flash.
 
+### 6. Font Loading
+Fonts are bundled locally — no Google Fonts CDN dependency.
+
+```
+public/
+  fonts/
+    Rajdhani-400/500/600/700.woff2   (latin, static)
+    DMSans-300/400/500/600.woff2     (latin, static — from Fontsource)
+    DMSans-300italic.woff2
+    Syne-800.woff2                   (latin, static)
+  fonts.css   ← @font-face declarations, url('fonts/filename.woff2')
+  index.html  ← <link rel="stylesheet" href="%PUBLIC_URL%/fonts.css">
+```
+
+**Critical:** `@font-face` declarations must NOT go in any `src/` CSS file. CRA's webpack treats `url()` in src CSS as module import paths and fails the build. `public/fonts.css` is copied verbatim and not processed by webpack.
+
+`keyforge-help.html` has its own inline `<style>` block with the subset it needs (Rajdhani 600/700, DM Sans 400/500/600), using relative paths `fonts/filename.woff2`.
+
+### 7. Auto-Launch (Start with Windows)
+```js
+const isAutoLaunch = process.argv.includes('--autolaunch');
+```
+Registry entry written by `setStartupEnabled`:
+```
+"C:\path\to\Trigr.exe" --autolaunch
+```
+`BrowserWindow` constructed with `show: !isAutoLaunch`. When auto-launched: tray initialises, window stays hidden. User opens via tray as normal. No other startup logic is affected.
+
+### 8. Foreground Watcher Visibility Guard
+`handleForegroundChange()` now returns early if the main window is on screen:
+```js
+if (mainWindow.isVisible() && !mainWindow.isMinimized()) return;
+```
+This guard sits immediately after the existing `_SELF_PROC_NAMES` check. Profile auto-switching only runs when the window is hidden to tray (`isVisible() = false`) or minimised to taskbar (`isMinimized() = true`). No stored state — evaluated live on every 1500ms tick. Crash-safe: the existing `if (!mainWindow) return` guard above it handles window destruction.
+
 ---
 
 ## Storage Key Format

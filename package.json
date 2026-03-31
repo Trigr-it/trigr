@@ -127,7 +127,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Trigr",
       "runAfterFinish": true,
-      "differentialPackage": true
+      "differentialPackage": true,
+      "artifactName": "Trigr-Setup.${ext}"
     },
     "mac": {
       "target": "dmg",

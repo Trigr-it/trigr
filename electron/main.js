@@ -3277,7 +3277,7 @@ ipcMain.on('start-download', (event, args) => {
   const os    = require('os');
   const path  = require('path');
 
-  const url  = `https://github.com/Trigr-it/trigr/releases/download/v${version}/Trigr-Setup-${version}.exe`;
+  const url  = `https://github.com/Trigr-it/trigr/releases/download/v${version}/Trigr-Setup.exe`;
   const dest = path.join(os.tmpdir(), `Trigr-Setup-${version}.exe`);
   console.log('[Updater] Downloading', url, '→', dest);
 

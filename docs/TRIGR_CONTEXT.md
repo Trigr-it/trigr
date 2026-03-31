@@ -1,6 +1,6 @@
 # TRIGR — Project Context
 > Read this file at the start of every CC session before touching any code.
-> Last updated: March 2026
+> Last updated: March 2026 (session 2)
 
 ---
 
@@ -104,6 +104,30 @@ Alpha is live with 2 testers. Google Form feedback pipeline is active.
 - `app.quit()` immediately after spawn
 - Only runs in production (`if (!isDev) { initAutoUpdater() }`)
 - Never shows in `npm run electron-dev` console — test only in installed version
+
+### Start with Windows (auto-launch)
+- Registry entry (`HKCU\...\Run`) now written as `"<execPath>" --autolaunch`
+- `isAutoLaunch = process.argv.includes('--autolaunch')` detected at startup
+- When auto-launched: `BrowserWindow` created with `show: false` — tray appears, window stays hidden
+- Normal launch: window shows as usual
+- Existing users who had the old registry entry (no arg) must re-toggle the setting once
+
+### Fonts (bundled — no CDN)
+- All fonts are bundled locally in `public/fonts/` — app works fully offline
+- Loaded via `<link rel="stylesheet" href="%PUBLIC_URL%/fonts.css">` in `public/index.html`
+- `@font-face` declarations live in `public/fonts.css` — NOT in any `src/` CSS file
+- `keyforge-help.html` has its own inline `<style>` block with `@font-face` declarations
+- Fonts: Rajdhani 400/500/600/700, DM Sans 300/400/500/600 normal + 300 italic, Syne 800
+
+### Logo / Header
+- Header wordmark uses Syne 800 (`font-family: 'Syne'`, `font-weight: 800`)
+- T icon/monogram SVG has been removed — wordmark text only
+- Colour: `var(--text-primary)` — works in both light and dark theme
+
+### Foreground watcher profile switching
+- Auto-switching is suppressed while the main window is visible (`mainWindow.isVisible() && !mainWindow.isMinimized()`)
+- Switching only resumes when the window is hidden to tray or minimised to taskbar
+- This allows users to leave Trigr open while testing macros in other apps without losing their selected profile
 
 ### Installer & Build
 - NSIS installer
@@ -358,6 +382,9 @@ All 6 core documents are stored in Google Drive (Trigr folder) as Google Docs AN
 4. **Publish sequence** — always in the exact order: `git add` → `git commit` → `npm run build` → `npm version patch` → `npm run publish`
 5. **Config writes** — always owned by `main.js`, never via renderer round-trip
 6. **Import config** — write directly to disk in main.js immediately after validation (not renderer saveConfig)
+7. **Font @font-face declarations** — must go in `public/fonts.css`, never in `src/` CSS files. Webpack treats `url()` in src CSS as module imports and fails the build if the file isn't in the JS module graph.
+8. **Font files** — live in `public/fonts/`. Files in `public/` are copied to `build/` by CRA — they survive builds. Never put font files in `build/` directly.
+9. **Start with Windows registry entry** — written as `"<execPath>" --autolaunch`. If you ever modify `setStartupEnabled`, preserve the `--autolaunch` arg — removing it breaks silent tray launch.
 
 ---
 

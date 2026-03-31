@@ -89,3 +89,6 @@ At the start of every CC session:
 - `loadConfig()` can return null on parse error — always use `loadConfigSafe()` for any read that matters
 - Help guide scaling IIFE must not intercept `window.show` — call `_trigrRescale` directly from `show()`
 - `.kf` elements in help guide: hide via `visibility:hidden` until `kf-ready` class added post-scaling, 150ms fade-in
+- **Font @font-face declarations go in `public/fonts.css` only** — never in `src/` CSS files. CRA webpack resolves `url()` in src CSS as module imports. Adding font `url()` paths to any file under `src/` will break `npm run build`.
+- **Start with Windows registry entry includes `--autolaunch`** — written as `"<execPath>" --autolaunch`. If you ever touch `setStartupEnabled`, preserve this arg. Removing it breaks silent tray launch. Existing users with the old entry (no arg) need to re-toggle the setting once.
+- **Foreground watcher is suppressed while the window is visible** — `handleForegroundChange` returns early when `mainWindow.isVisible() && !mainWindow.isMinimized()`. Do not remove this guard; it prevents profile-switching mid-session when the user tabs to another app while Trigr is open.
