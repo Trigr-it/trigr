@@ -935,8 +935,8 @@ export default function MacroPanel({
         </div>
       </div>
 
-      {/* Press mode toggle — for all keyboard keys (not mouse) */}
-      {selectedKey && !selectedKey.startsWith('MOUSE_') && (
+      {/* Press mode toggle — keyboard keys and mouse buttons */}
+      {selectedKey && (
         <div className="press-mode-bar">
           <button
             className={`press-mode-btn${pressMode === 'single' ? ' active' : ''}`}

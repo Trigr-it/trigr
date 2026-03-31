@@ -2001,7 +2001,7 @@ function startHotkeyListener() {
             keypressBuffer = '';
             pendingMacroIsBare = false;
             console.log(`[KeyForge] Bare mouse match: ${mouseKeyId} → [${bareMacro.type}] ${bareMacro.label}`);
-            executeMacro(bareMacro).catch(console.error);
+            dispatchHotkeyWithDoubleTap(bareStorageKey, bareMacro);
           }
         }
       }
@@ -2021,11 +2021,37 @@ function startHotkeyListener() {
         lastKeySuppressed = false;
       }
       keypressBuffer = '';
-      if (pendingMacro) {
-        console.warn(`[KeyForge] Replacing unexecuted pending macro: [${pendingMacro.type}] ${pendingMacro.label}`);
+
+      // ── Double-tap detection for modifier+mouse ────────────────────────────
+      // Mirrors the keydown-time Path B used for keyboard hotkeys (lines ~1898-1924).
+      const doubleMacroMouse = activeAssignments[storageKey + '::double'];
+      if (doubleMacroMouse) {
+        const nowMouse  = Date.now();
+        const lastMouse = lastHotkeyTime.get(storageKey) || 0;
+        if (nowMouse - lastMouse < doubleTapWindow && lastHotkeyTime.has(storageKey)) {
+          // Second click within window — resolve as double immediately
+          if (pendingHotkeyTimer.has(storageKey)) {
+            clearTimeout(pendingHotkeyTimer.get(storageKey));
+            pendingHotkeyTimer.delete(storageKey);
+          }
+          lastHotkeyTime.delete(storageKey);
+          console.log(`[KeyForge] ×2 Mouse double-click: ${storageKey}`);
+          pendingMacro           = doubleMacroMouse;
+          pendingMacroStorageKey = null; // null → executeMacro directly at modifier-release
+        } else {
+          // First click — record time so second mousedown can detect the window
+          lastHotkeyTime.set(storageKey, nowMouse);
+          console.log(`[KeyForge] Match: ${comboStr}+${mouseKeyId} — deferred until modifiers released`);
+          pendingMacro           = macro;
+          pendingMacroStorageKey = storageKey;
+        }
+      } else {
+        if (pendingMacro) {
+          console.warn(`[KeyForge] Replacing unexecuted pending macro: [${pendingMacro.type}] ${pendingMacro.label}`);
+        }
+        console.log(`[KeyForge] Match: ${comboStr}+${mouseKeyId} — deferred until modifiers released`);
+        pendingMacro = macro;
       }
-      console.log(`[KeyForge] Match: ${comboStr}+${mouseKeyId} — deferred until modifiers released`);
-      pendingMacro = macro;
     }
   });
 

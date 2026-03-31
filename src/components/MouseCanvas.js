@@ -75,10 +75,22 @@ const ZONE_DOT = {
   MOUSE_SIDE1:       [53, 224],
 };
 
+// ×2 badge positions [x, y] — top-right of each zone (textAnchor="end")
+const ZONE_X2 = {
+  MOUSE_LEFT:        [80,  28],
+  MOUSE_RIGHT:       [184, 28],
+  MOUSE_SCROLL_UP:   [108, 28],
+  MOUSE_MIDDLE:      [108, 74],
+  MOUSE_SCROLL_DOWN: [108, 106],
+  MOUSE_SIDE2:       [52,  175],
+  MOUSE_SIDE1:       [52,  230],
+};
+
 export default function MouseCanvas({
   selectedKey,
   onKeySelect,
   getKeyAssignment,
+  hasDoubleAssignment,
   lastFired,
   activeModifiers,
   onToggleModifier,
@@ -354,6 +366,21 @@ export default function MouseCanvas({
                 className="mc-risky-icon"
                 pointerEvents="none"
               >⚠</text>
+            );
+          })}
+
+          {/* ── Double-click (×2) badges ─────────────────────────────────────── */}
+          {hasDoubleAssignment && Object.entries(ZONE_X2).map(([id, [x, y]]) => {
+            if (!hasDoubleAssignment(id)) return null;
+            return (
+              <text
+                key={`x2-${id}`}
+                x={x} y={y}
+                className="mc-double-badge"
+                textAnchor="end"
+                dominantBaseline="middle"
+                pointerEvents="none"
+              >×2</text>
             );
           })}
         </svg>

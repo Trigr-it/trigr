@@ -167,6 +167,15 @@
   fill: rgba(245,158,11,0.9);
 }
 
+/* ── DOUBLE-CLICK BADGE ───────────────────────────────── */
+.mc-double-badge {
+  font-family: var(--font-display);
+  font-size: 7px;
+  font-weight: 700;
+  fill: var(--accent);
+  opacity: 0.85;
+}
+
 /* ── ADVISORY BANNER ──────────────────────────────────── */
 .mouse-advisory {
   width: 100%;

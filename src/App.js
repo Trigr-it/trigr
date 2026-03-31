@@ -1125,6 +1125,7 @@ function App() {
               selectedKey={selectedKey}
               onKeySelect={handleKeySelect}
               getKeyAssignment={getKeyAssignment}
+              hasDoubleAssignment={hasDoubleAssignment}
               lastFired={lastFired}
               activeModifiers={activeModifiers}
               onToggleModifier={handleToggleModifier}
