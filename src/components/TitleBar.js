@@ -192,11 +192,7 @@ export default function TitleBar({
     <div className="titlebar" data-drag="true">
       <div className="titlebar-left">
         <div className="app-logo">
-          <svg width="22" height="22" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-            <rect width="256" height="256" rx="52" fill="#e8a020"/>
-            <text x="128" y="182" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="168" fill="white" letter-spacing="-4">T</text>
-          </svg>
-          <span className="app-name">Trigr</span>
+<span className="app-name">Trigr</span>
         </div>
 
         <div className="titlebar-divider" />

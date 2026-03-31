@@ -59,7 +59,7 @@ export default function Sidebar({
 
   // Sync active tab when the keyboard modifier layer changes
   useEffect(() => {
-    if (currentCombo) setActiveTab(currentCombo);
+    setActiveTab(currentCombo || 'All');
   }, [currentCombo]);
 
   // Always show BARE tab for app-linked profiles (even when no assignments yet)

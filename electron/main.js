@@ -109,8 +109,9 @@ function _buildPausedTrayImage(baseImage) {
   return nativeImage.createFromBuffer(buf, { scaleFactor: 1.0 });
 }
 
-const isDev      = process.env.NODE_ENV === 'development' || !app.isPackaged;
-const isDemoMode = process.argv.includes('--demo-mode');
+const isDev        = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDemoMode   = process.argv.includes('--demo-mode');
+const isAutoLaunch = process.argv.includes('--autolaunch');
 
 // ── Demo config ───────────────────────────────────────────────────────────────
 // Used when launched with --demo-mode. Never written to disk.
@@ -2157,6 +2158,10 @@ function handleForegroundChange(procName) {
   // Never auto-switch when KeyForge itself is the focused application.
   if (_SELF_PROC_NAMES.has(name)) return;
 
+  // Suppress auto-switching while the Trigr window is open and visible on screen.
+  // Switching resumes only when the window is hidden to tray or minimised.
+  if (mainWindow.isVisible() && !mainWindow.isMinimized()) return;
+
   // No-op when no profiles have a linked app configured
   const linked = Object.entries(profileSettings).filter(([, s]) => s.linkedApp);
   if (linked.length === 0) return;
@@ -2225,7 +2230,7 @@ function getStartupEnabled(callback) {
 function setStartupEnabled(enable) {
   if (process.platform !== 'win32') return;
   if (enable) {
-    exec(`reg add "${REG_RUN}" /v "${REG_NAME}" /d "${process.execPath}" /f`);
+    exec(`reg add "${REG_RUN}" /v "${REG_NAME}" /d "\\"${process.execPath}\\" --autolaunch" /f`);
   } else {
     exec(`reg delete "${REG_RUN}" /v "${REG_NAME}" /f 2>nul`);
   }
@@ -3038,6 +3043,7 @@ function createWindow() {
       ? path.join(process.resourcesPath, 'icon.png')
       : path.join(__dirname, '..', 'assets', 'icons', 'icon.png'),
     backgroundColor: '#0d0d11',
+    show: !isAutoLaunch,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,

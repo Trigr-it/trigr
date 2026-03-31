@@ -33,9 +33,9 @@
 }
 
 .app-name {
-  font-family: var(--font-display);
+  font-family: 'Syne', sans-serif;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-primary);
   letter-spacing: 0.04em;
 }

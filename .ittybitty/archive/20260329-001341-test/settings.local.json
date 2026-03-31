@@ -1,0 +1,121 @@
+{
+  "permissions": {
+    "allow": [
+      "AskUserQuestion",
+      "Bash(./ib:*)",
+      "Bash(cat '/c/Program Files \\(x86\\)/Microsoft Visual Studio/18/BuildTools/MSBuild/Microsoft/VC/v180/Microsoft.CppBuild.targets')",
+      "Bash(cat '/c/Program Files \\(x86\\)/Microsoft Visual Studio/18/BuildTools/MSBuild/Microsoft/VC/v180/Platforms/x64/PlatformToolsets/v145/Toolset.props')",
+      "Bash(cat:*)",
+      "Bash(cmd.exe /c \"dir \"\"C:\\\\Program Files \\(x86\\)\\\\Microsoft Visual Studio\"\" /b 2>&1\")",
+      "Bash(cmd.exe /c \"dir \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\"\" /b 2>&1\")",
+      "Bash(cmd.exe /c \"reg query \"\"HKLM\\\\SOFTWARE\\\\Microsoft\\\\VisualStudio\\\\SxS\\\\VS7\"\" 2>&1\")",
+      "Bash(cmd.exe /c \"reg query \"\"HKLM\\\\SOFTWARE\\\\WOW6432Node\\\\Microsoft\\\\VisualStudio\\\\SxS\\\\VS7\"\" 2>&1\")",
+      "Bash(cmd.exe /c \"where msbuild 2>&1\")",
+      "Bash(find \"/c/Program Files \\(x86\\)/Microsoft Visual Studio/18/BuildTools/MSBuild/Microsoft/VC/v180/Platforms\" -name \"v145\" -type d)",
+      "Bash(find node_modules -name package.json -path */node-gyp/package.json)",
+      "Bash(find node_modules/@nut-tree-fork -name *.node)",
+      "Bash(find node_modules/electron -name *.exe)",
+      "Bash(find node_modules/uiohook-napi -name *.d.ts)",
+      "Bash(find node_modules/uiohook-napi -name *.gyp)",
+      "Bash(find node_modules/uiohook-napi -name *.node)",
+      "Bash(find node_modules/uiohook-napi -name *.sln)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git diff:*)",
+      "Bash(git grep:*)",
+      "Bash(git log:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)",
+      "Bash(git restore:*)",
+      "Bash(git rm:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
+      "Bash(grep -r \"uiohook\\\\|nutjs\" /c/Users/rory/Downloads/keyforge-prototype/keyforge/src --include=*.js --include=*.jsx)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(ib:*)",
+      "Bash(ls:*)",
+      "Bash(node -e \"const d=require\\(''''fs''''\\).readFileSync\\(0,''''utf8''''\\);const j=JSON.parse\\(d\\);console.log\\(j.version\\)\")",
+      "Bash(node -e \"const vs = require\\(''''node-gyp''''\\); console.log\\(vs\\)\")",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(npm_config_arch=x64 node node_modules/electron/install.js)",
+      "Bash(npx @electron/rebuild --version)",
+      "Bash(npx:*)",
+      "Bash(pwd:*)",
+      "Bash(python3:*)",
+      "Bash(reg query:*)",
+      "Bash(tail:*)",
+      "Bash(xargs cat:*)",
+      "Bash(xargs grep:*)",
+      "Edit",
+      "Glob",
+      "Grep",
+      "KillShell",
+      "LS",
+      "MultiEdit",
+      "NotebookEdit",
+      "Read",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio//**)",
+      "Read(//c/Program Files/**)",
+      "Task",
+      "TaskOutput",
+      "TodoWrite",
+      "WebFetch",
+      "WebSearch",
+      "Write"
+    ],
+    "deny": [
+      "EnterPlanMode",
+      "ExitPlanMode"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ib hook-status __AGENT_ID__"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ib hook-permission-denied __AGENT_ID__"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ib hook-check-path __AGENT_ID__"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ib hooks session-start"
+          }
+        ]
+      }
+    ]
+  }
+}
