@@ -125,6 +125,8 @@ When assignments change: call both `updateAssignments()` and `updateProfileSetti
 
 ## Double Press Implementation
 
+Applies to both **keyboard keys** and **mouse buttons**.
+
 - Storage: base key + `::double` suffix variant
 - Detection: `lastHotkeyTime` map + `pendingHotkeyTimer` map
 - If hotkey has no double assignment → fire immediately, no delay
@@ -132,6 +134,22 @@ When assignments change: call both `updateAssignments()` and `updateProfileSetti
 - Configurable window: `doubleTapWindow` setting, default 300ms, range 150-500ms
 - RegisterHotKey called once per base combo at OS level — double/single distinction handled in timer logic
 - On reassign: both `::key` and `::key::double` variants move together
+
+### Mouse double press — two paths
+
+**Bare mouse** (no modifier): `dispatchHotkeyWithDoubleTap(bareStorageKey, bareMacro)` — same generic function as keyboard.
+
+**Modifier + mouse**: Path-B inline detection at mousedown time (mirrors keyboard keydown-time detection):
+```js
+const doubleMacroMouse = activeAssignments[storageKey + '::double'];
+if (doubleMacroMouse) {
+  // First click: arm timer. Second click within window: resolve double.
+  // Uses lastHotkeyTime / pendingHotkeyTimer maps, same as keyboard.
+}
+// Resolved macro stored in pendingMacro; fired when modifiers release (keyup).
+```
+
+UI: `ZONE_X2` coordinate map in `MouseCanvas.js` controls where ×2 badges appear per zone. `mc-double-badge` CSS class styles them. Single/Double toggle bar in `MacroPanel` now shown for mouse buttons (the `!selectedKey.startsWith('MOUSE_')` guard was removed).
 
 ---
 
@@ -171,6 +189,15 @@ Installer is ~77MB because:
 - Unused locale files excluded
 - `react-scripts` moved to devDependencies
 - Source maps removed
+
+### Artifact naming
+`package.json` nsis block: `"artifactName": "Trigr-Setup.${ext}"`
+Output is always `Trigr-Setup.exe` regardless of version. This enables a permanent GitHub release download URL:
+```
+https://github.com/Trigr-it/trigr/releases/latest/download/Trigr-Setup.exe
+```
+Auto-updater download URL and landing page buttons all point to this URL.
+**Note:** Users on pre-rename versions (< 0.1.44) will receive a failed auto-update once — the old URL references a versioned filename that no longer exists. They must download manually once. After that, all future updates work via the permanent URL.
 
 ---
 

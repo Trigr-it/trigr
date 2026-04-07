@@ -1,6 +1,6 @@
 # TRIGR — Project Context
 > Read this file at the start of every CC session before touching any code.
-> Last updated: March 2026 (session 2)
+> Last updated: March 2026 (session 3)
 
 ---
 
@@ -29,7 +29,7 @@ Trigr sits in the Windows system tray and lets users create keyboard hotkeys, ma
 
 ## 03 — Current Version
 
-**v0.1.41** (as of March 2026)
+**v0.1.44** (as of March 2026)
 
 Alpha is live with 2 testers. Google Form feedback pipeline is active.
 
@@ -45,11 +45,12 @@ Alpha is live with 2 testers. Google Form feedback pipeline is active.
 - App-specific profiles with automatic foreground watcher switching
 - Multiple global profiles — user selects active base profile
 - Bare key assignments (no modifier required)
-- Double press hotkeys — single press and double press have separate assignments
+- Double press hotkeys — single press and double press have separate assignments, for both keyboard keys and mouse buttons
   - Timer-based detection (default 300ms window, configurable 150-500ms)
   - Storage format: `Profile::Modifier::Key` (single) and `Profile::Modifier::Key::double` (double)
   - Both assignments move together on reassign
   - If no double assignment exists, single press fires immediately with no delay
+  - Mouse modifier+mouse: Path-B inline detection at mousedown. Bare mouse: `dispatchHotkeyWithDoubleTap` directly
 - Mouse button assignments (multiple versions implemented — DO NOT assume this is missing)
 - Numpad support via slide-out panel
 - x2 badge on keyboard keys that have double press assigned
@@ -99,6 +100,7 @@ Alpha is live with 2 testers. Google Form feedback pipeline is active.
 
 ### Auto-updater (CRITICAL — DO NOT MODIFY)
 - Direct HTTPS download to `os.tmpdir()` — does NOT use electron-updater's built-in download
+- Download URL uses consistent filename: `Trigr-Setup.exe` (no version in URL)
 - Spawn with `/VERYSILENT /RESTARTAPPLICATIONS` flags
 - Fire-and-forget — no await after spawn
 - `app.quit()` immediately after spawn
@@ -132,6 +134,8 @@ Alpha is live with 2 testers. Google Form feedback pipeline is active.
 ### Installer & Build
 - NSIS installer
 - ~77MB (reduced from 119MB)
+- `artifactName: "Trigr-Setup.${ext}"` in electron-builder nsis config — output is always `Trigr-Setup.exe` (no version in filename)
+- Permanent download URL: `https://github.com/Trigr-it/trigr/releases/latest/download/Trigr-Setup.exe`
 - Excluded: koffi cross-platform binaries, unused locales
 - `react-scripts` moved to devDependencies
 - Source maps removed

@@ -1,6 +1,6 @@
 # TRIGR — Feature Status Reference
 > All features, their completion status, and tier placement.
-> Updated: March 2026
+> Updated: March 2026 (session 3)
 
 ---
 
@@ -16,8 +16,11 @@
 | Action types: Open App | Launch app or file |
 | Action types: Open URL | Default browser |
 | Action types: Open Folder | File Explorer |
-| Double press hotkeys | Single + double have separate assignments. Timer 300ms default. Both move on reassign. |
-| Mouse button assignments | Multiple versions implemented — confirmed working |
+| Double press hotkeys | Single + double have separate assignments for keyboard keys AND mouse buttons. Timer 300ms default. Both move on reassign. |
+| Mouse button assignments | Multiple versions implemented — confirmed working. Double press fully supported. |
+| Mouse ×2 badge | ZONE_X2 coordinates in MouseCanvas; mc-double-badge SVG text element renders on zones with double assignment |
+| Mouse double press toggle bar | Single/Double press toggle bar in action panel now shows for mouse buttons (MOUSE_ guard removed) |
+| Permanent download URL | artifactName: "Trigr-Setup.${ext}" — installer always Trigr-Setup.exe. Landing page links to /releases/latest/download/Trigr-Setup.exe |
 | Bare key assignments | No modifier required |
 | App-specific profiles | Foreground watcher, auto-switch |
 | Multiple global profiles | User selects active base |
